@@ -262,7 +262,10 @@
       <input type="file" id="prodImagen" accept="image/*" />
 
       <label for="prodCodigoBarra">Código de barra de fábrica (compartido entre tonos, opcional)</label>
-      <input type="text" id="prodCodigoBarra" placeholder="Ej: 7708089795352" />
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="prodCodigoBarra" placeholder="Ej: 7708089795352" style="flex:1;" />
+        <button type="button" class="btn-ghost" id="scanProdCodigoBtn" title="Escanear con la cámara">📷</button>
+      </div>
 
       <h2 style="margin-top:20px;">Tonos / variantes</h2>
       <p class="sub" style="margin:0 0 10px;">Agrega al menos uno. Si el producto no tiene variedad de color, deja el nombre como "Único".</p>
@@ -312,7 +315,10 @@
         <input type="file" id="editProdImagen" accept="image/*" />
 
         <label for="editProdCodigoBarra">Código de barra de fábrica</label>
-        <input type="text" id="editProdCodigoBarra" />
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="editProdCodigoBarra" style="flex:1;" />
+          <button type="button" class="btn-ghost" id="scanEditProdCodigoBtn" title="Escanear con la cámara">📷</button>
+        </div>
 
         <label style="display:flex; align-items:center; gap:8px; margin-top:16px;">
           <input type="checkbox" id="editProdActivo" style="width:auto; margin:0;" />
@@ -330,8 +336,14 @@
     </div>
 
 
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Buscar producto (ej: labial)..." />
+    <div class="search-box" style="display:flex; gap:8px; align-items:center;">
+      <input type="text" id="searchInput" placeholder="Buscar producto (ej: labial)..." style="flex:1;" />
+      <button type="button" class="btn-ghost" id="scanSearchBtn" title="Escanear código con la cámara">📷</button>
+    </div>
+    <div id="scannerBox" style="display:none; margin-bottom:18px; border:1px solid var(--line); border-radius:10px; padding:10px;">
+      <div id="reader" style="width:100%;"></div>
+      <p id="scannerStatus" class="sub" style="margin:8px 0 0;">Apunta la cámara al código de barras.</p>
+      <button type="button" class="btn-ghost" id="cerrarScannerBtn" style="width:100%; margin-top:8px;">Cancelar escaneo</button>
     </div>
     <div class="results" id="results">
       <div class="empty-msg">Escribe arriba para buscar productos.</div>
@@ -370,6 +382,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
   const SUPABASE_URL = "https://pvlpawwimdbxsvgggima.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_dqOJoYPxXWIQojgdxC6IKg_jE_jhTzh";
@@ -468,7 +481,7 @@
     const { data, error } = await supabaseClient
       .from('precios_actuales')
       .select('*')
-      .ilike('nombre', '%' + term + '%')
+      .or('nombre.ilike.%' + term + '%,codigo_barra.ilike.%' + term + '%,codigo_interno.ilike.%' + term + '%')
       .order('nombre')
       .limit(80);
 
@@ -1573,6 +1586,82 @@
   });
 
 
+  // --- Escáner de código de barra con la cámara (reutilizable) ---
+  // Nota sobre el lector físico: no necesita nada de esto, funciona
+  // como un teclado; escribe el código donde esté el cursor. Esto
+  // es solo para cuando se usa la cámara del celular.
+  const scannerBox = document.getElementById('scannerBox');
+  const scannerStatusEl = document.getElementById('scannerStatus');
+  const cerrarScannerBtn = document.getElementById('cerrarScannerBtn');
+  let html5QrCodeInstance = null;
+  let scannerCorriendo = false;
+  let scannerTargetInputId = null;
+  let scannerAlTerminar = null;
+
+  async function abrirEscaner(targetInputId, alTerminar) {
+    scannerTargetInputId = targetInputId;
+    scannerAlTerminar = alTerminar || null;
+    scannerBox.style.display = 'block';
+    scannerStatusEl.textContent = 'Apunta la cámara al código de barras.';
+    scannerBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    if (!html5QrCodeInstance) {
+      html5QrCodeInstance = new Html5Qrcode('reader');
+    }
+
+    const formatos = [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39
+    ];
+
+    try {
+      await html5QrCodeInstance.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 220, formatsToSupport: formatos },
+        function (decodedText) {
+          const targetInput = document.getElementById(scannerTargetInputId);
+          if (targetInput) targetInput.value = decodedText;
+          const callback = scannerAlTerminar;
+          cerrarEscaner();
+          if (callback) callback(decodedText);
+        },
+        function () { /* no se detectó código en este frame, es normal, se ignora */ }
+      );
+      scannerCorriendo = true;
+    } catch (err) {
+      scannerStatusEl.textContent = 'No se pudo acceder a la cámara: ' + err;
+    }
+  }
+
+  function cerrarEscaner() {
+    scannerBox.style.display = 'none';
+    if (html5QrCodeInstance && scannerCorriendo) {
+      html5QrCodeInstance.stop()
+        .then(function () { html5QrCodeInstance.clear(); })
+        .catch(function () { /* si ya se había detenido, no pasa nada */ });
+    }
+    scannerCorriendo = false;
+  }
+
+  cerrarScannerBtn.addEventListener('click', cerrarEscaner);
+
+  document.getElementById('scanSearchBtn').addEventListener('click', function () {
+    abrirEscaner('searchInput', function () { runSearch(); });
+  });
+
+  document.getElementById('scanProdCodigoBtn').addEventListener('click', function () {
+    abrirEscaner('prodCodigoBarra');
+  });
+
+  document.getElementById('scanEditProdCodigoBtn').addEventListener('click', function () {
+    abrirEscaner('editProdCodigoBarra');
+  });
+
+  // --- Al cargar: revisar si ya hay sesión activa ---
   window.addEventListener('DOMContentLoaded', async function () {
     diag('Página cargada: ' + new Date().toLocaleTimeString());
     if (!initSupabaseClient()) return;
