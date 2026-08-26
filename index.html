@@ -428,7 +428,14 @@
         const addBtn = card.querySelector('.btn-add');
         addBtn.addEventListener('click', function () {
           const cantidad = parseInt(qtyInput.value, 10) || 1;
-          if (cantidad > v.cantidad_disponible) { alert('Solo hay ' + v.cantidad_disponible + ' unidades disponibles.'); return; }
+          const yaEnCarrito = cantidadEnCarrito(v.variante_id);
+          const restante = v.cantidad_disponible - yaEnCarrito;
+          if (cantidad > restante) {
+            alert(restante > 0
+              ? 'Solo puedes agregar ' + restante + ' más (ya tienes ' + yaEnCarrito + ' en el carrito).'
+              : 'Ya agregaste todo el stock disponible de este producto al carrito.');
+            return;
+          }
           addToCart(v, cantidad);
         });
 
@@ -484,8 +491,12 @@
         const addBtn = row.querySelector('.btn-add');
         addBtn.addEventListener('click', function () {
           const cantidad = parseInt(qtyInput.value, 10) || 1;
-          if (cantidad > v.cantidad_disponible) {
-            alert('Solo hay ' + v.cantidad_disponible + ' unidades disponibles de este tono.');
+          const yaEnCarrito = cantidadEnCarrito(v.variante_id);
+          const restante = v.cantidad_disponible - yaEnCarrito;
+          if (cantidad > restante) {
+            alert(restante > 0
+              ? 'Solo puedes agregar ' + restante + ' más de este tono (ya tienes ' + yaEnCarrito + ' en el carrito).'
+              : 'Ya agregaste todo el stock disponible de este tono al carrito.');
             return;
           }
           addToCart(v, cantidad);
@@ -503,6 +514,15 @@
   // sin decidir el nivel todavía. El nivel se calcula recién en
   // calcularCarrito(), porque depende de TODO el carrito junto, no solo
   // de esta línea.
+  // Cuánto de esta variante ya está agregado al carrito, para no dejar
+  // que el buscador compare siempre contra el stock "de origen" sin
+  // descontar lo que ya se agregó en clics anteriores.
+  function cantidadEnCarrito(varianteId) {
+    return cart
+      .filter(function (item) { return item.variante_id === varianteId; })
+      .reduce(function (sum, item) { return sum + item.cantidad; }, 0);
+  }
+
   function addToCart(variante, cantidad) {
     cart.push({
       variante_id: variante.variante_id,
