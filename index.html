@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Panel interno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FBF6F3; --ink: #2A211F; --wine: #7A2E3A; --wine-dark: #5E2129;
+    --gold: #C9A768; --line: #E7DAD3; --error: #B23B3B; --ok: #2F6B4F;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100dvh; background:var(--bg); font-family:'Inter',sans-serif; color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:24px; min-height:100dvh; display:flex; flex-direction:column; }
+
+  /* --- Login --- */
+  .center { flex:1; display:flex; align-items:center; justify-content:center; }
+  .card { width:100%; max-width:380px; }
+  .eyebrow { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--wine); margin-bottom:8px; font-weight:600; }
+  h1 { font-family:'Fraunces',serif; font-weight:600; font-size:28px; margin:0 0 6px; line-height:1.1; }
+  .sub { color:#6B5E5A; font-size:14px; margin:0 0 24px; }
+  label { display:block; font-size:13px; font-weight:500; margin-bottom:6px; margin-top:18px; }
+  input[type=email], input[type=password] {
+    width:100%; padding:12px 14px; border:1.5px solid var(--line); border-radius:8px;
+    font-size:15px; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  input:focus { outline:none; border-color:var(--wine); }
+  button { border:none; border-radius:8px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .btn-primary { width:100%; margin-top:22px; padding:13px; background:var(--wine); color:#fff; }
+  .btn-primary:hover { background:var(--wine-dark); }
+  #status { margin-top:16px; font-size:14px; min-height:20px; }
+  #status.error { color:var(--error); }
+  #status.ok { color:var(--ok); }
+  #diag { margin-top:20px; padding:12px; border:1px dashed var(--line); border-radius:8px; font-size:12px; color:#8A7A74; font-family:monospace; white-space:pre-wrap; }
+
+  /* --- Panel --- */
+  #panelView { display:none; flex:1; flex-direction:column; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .topbar .who { font-size:13px; color:#6B5E5A; }
+  .btn-ghost { background:transparent; color:var(--wine); border:1.5px solid var(--wine); padding:8px 12px; font-size:13px; }
+  .btn-ghost:hover { background:#F3E6E3; }
+
+  .search-box { position:relative; margin-bottom:18px; }
+  #searchInput {
+    width:100%; padding:13px 14px; border:1.5px solid var(--line); border-radius:10px;
+    font-size:15px; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  #searchInput:focus { outline:none; border-color:var(--wine); }
+
+  .results { display:flex; flex-direction:column; gap:10px; margin-bottom:26px; max-height:440px; overflow-y:auto; padding-right:2px; }
+  .result-item {
+    background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:12px 14px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .result-item .info { flex:1; min-width:0; }
+  .result-item .name { font-weight:600; font-size:14px; }
+  .result-item .prices { font-size:12px; color:#6B5E5A; margin-top:2px; }
+  .result-item .addrow { display:flex; align-items:center; gap:6px; }
+  .qty-input {
+    width:44px; padding:8px 4px; text-align:center; border:1.5px solid var(--line);
+    border-radius:6px; font-size:14px; font-family:inherit;
+  }
+  .btn-add { background:var(--gold); color:#3A2E12; padding:8px 12px; font-size:13px; }
+  .btn-add:hover { filter:brightness(0.95); }
+  .empty-msg { font-size:13px; color:#8A7A74; padding:8px 2px; }
+
+  .result-card { flex-direction:column; align-items:stretch; }
+  .result-header { display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; }
+  .tonos-list { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+  .tono-row {
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:#FBF6F3; border-radius:8px; padding:8px 10px;
+  }
+  .tono-info { display:flex; flex-direction:column; gap:1px; font-size:12px; }
+  .tono-name { font-weight:600; font-size:13px; }
+  .tono-stock { color:#6B5E5A; }
+  .tono-precio { color:var(--wine); font-weight:600; }
+
+  .cart-section h2 {
+    font-family:'Fraunces',serif; font-size:19px; font-weight:600; margin:0 0 10px;
+  }
+  .cart-list { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .cart-row {
+    background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:10px 14px;
+    display:flex; justify-content:space-between; align-items:center; font-size:13px;
+  }
+  .cart-row .meta { color:#6B5E5A; font-size:12px; }
+  .cart-row .remove { background:transparent; color:var(--error); border:none; font-size:12px; padding:4px; }
+  .cart-empty { font-size:13px; color:#8A7A74; padding:14px; text-align:center; border:1.5px dashed var(--line); border-radius:10px; }
+
+  .total-bar {
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:16px; background:#fff; border:1.5px solid var(--wine); border-radius:10px; margin-top:14px;
+  }
+  .total-bar .label { font-size:13px; color:#6B5E5A; }
+  .total-bar .amount { font-family:'Fraunces',serif; font-size:26px; font-weight:600; color:var(--wine); }
+
+  .cliente-section { margin-top:8px; }
+  .cliente-section h2 { font-family:'Fraunces',serif; font-size:19px; font-weight:600; margin:0 0 10px; }
+  .cliente-section input, .cliente-section select {
+    width:100%; padding:11px 13px; border:1.5px solid var(--line); border-radius:8px;
+    font-size:14px; font-family:inherit; background:#fff; color:var(--ink); margin-bottom:2px;
+  }
+  .cliente-section label { display:block; font-size:13px; font-weight:500; margin:14px 0 6px; }
+
+  .btn-confirm {
+    width:100%; margin-top:22px; padding:14px; background:var(--wine); color:#fff; font-size:15px;
+  }
+  .btn-confirm:hover { background:var(--wine-dark); }
+  #ventaStatus { margin-top:12px; font-size:14px; text-align:center; }
+  #ventaStatus.error { color:var(--error); }
+  #ventaStatus.ok { color:var(--ok); }
+
+  .producto-form {
+    background:#fff; border:1.5px solid var(--line); border-radius:10px;
+    padding:16px; margin-bottom:20px;
+  }
+  .producto-form h2 { font-family:'Fraunces',serif; font-size:18px; font-weight:600; margin:0 0 10px; }
+  .producto-form label { display:block; font-size:13px; font-weight:500; margin:12px 0 6px; }
+  .producto-form input, .producto-form textarea {
+    width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:8px;
+    font-size:14px; font-family:inherit; background:#fff; color:var(--ink); resize:vertical;
+  }
+  #productoStatus { margin-top:10px; font-size:13px; }
+  #productoStatus.error { color:var(--error); }
+  #productoStatus.ok { color:var(--ok); }
+
+  .tono-form-row {
+    border:1.5px dashed var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .tono-form-row input { margin-bottom:0; }
+  .tono-form-row .quitar-tono-btn {
+    align-self:flex-end; background:transparent; color:var(--error); border:none;
+    font-size:12px; padding:2px; width:auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== LOGIN ===== -->
+  <div class="center" id="loginView">
+    <div class="card">
+      <div class="eyebrow">Panel interno</div>
+      <h1>Iniciar sesión</h1>
+      <p class="sub">Acceso exclusivo para el equipo de la tienda.</p>
+
+      <form id="loginForm">
+        <label for="email">Correo</label>
+        <input type="email" id="email" required autocomplete="username" />
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" required autocomplete="current-password" />
+        <button type="submit" class="btn-primary" id="submitBtn">Entrar</button>
+      </form>
+
+      <p id="status"></p>
+      <div id="diag"></div>
+    </div>
+  </div>
+
+  <!-- ===== PANEL (después de login) ===== -->
+  <div id="panelView">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Panel interno</div>
+        <div class="who">Conectado como <strong id="whoEmail"></strong></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
+        <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
+        <button class="btn-ghost" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <div class="producto-form" id="configForm" style="display:none;">
+      <h2>Tasa de cambio del día</h2>
+      <p class="sub" style="margin:0 0 4px;" id="tasaActualTexto">Cargando...</p>
+      <label for="cfgTasaBcv">Tasa BCV</label>
+      <input type="number" step="0.0001" id="cfgTasaBcv" placeholder="Ej: 40.00" />
+      <label for="cfgTasaBinance">Tasa Binance P2P</label>
+      <input type="number" step="0.0001" id="cfgTasaBinance" placeholder="Ej: 46.00" />
+      <button type="button" class="btn-confirm" id="guardarTasaBtn" style="margin-top:12px;">Guardar nueva tasa</button>
+      <p id="tasaStatus"></p>
+
+      <h2 style="margin-top:24px;">Márgenes de ganancia (%)</h2>
+      <label for="cfgMargenDetal">Detal</label>
+      <input type="number" step="0.01" id="cfgMargenDetal" />
+      <label for="cfgMargenMayor">Mayor</label>
+      <input type="number" step="0.01" id="cfgMargenMayor" />
+      <label for="cfgMargenGranMayor">Gran mayor</label>
+      <input type="number" step="0.01" id="cfgMargenGranMayor" />
+      <button type="button" class="btn-confirm" id="guardarMargenesBtn" style="margin-top:12px;">Guardar márgenes</button>
+      <p id="margenesStatus"></p>
+    </div>
+
+    <div class="producto-form" id="productoForm" style="display:none;">
+      <h2>Nuevo producto</h2>
+      <label for="prodNombre">Nombre</label>
+      <input type="text" id="prodNombre" placeholder="Ej: Labial Mate Rojo" />
+
+      <label for="prodDescripcion">Descripción (para el cliente, en palabras simples)</label>
+      <textarea id="prodDescripcion" rows="3" placeholder="Ej: Labial líquido de larga duración, acabado mate, no reseca los labios."></textarea>
+
+      <label for="prodCategoria">Categoría</label>
+      <input type="text" id="prodCategoria" placeholder="Ej: maquillaje, skincare, perfume" />
+      <label for="prodCosto">Costo base (USD, sin colchón ni margen)</label>
+      <input type="number" step="0.01" id="prodCosto" placeholder="Ej: 3.50" />
+      <label for="prodProveedor">Proveedor</label>
+      <input type="text" id="prodProveedor" placeholder="Ej: Distribuidora Ejemplo" />
+
+      <button type="button" class="btn-ghost" id="sugerirPreciosBtn" style="margin-top:14px; width:100%;">Sugerir precios según el costo</button>
+
+      <label for="prodPrecioDetal">Precio detal (editable)</label>
+      <input type="number" step="0.01" id="prodPrecioDetal" placeholder="0.00" />
+      <label for="prodPrecioMayor">Precio mayor (editable)</label>
+      <input type="number" step="0.01" id="prodPrecioMayor" placeholder="0.00" />
+      <label for="prodPrecioGranMayor">Precio gran mayor (editable)</label>
+      <input type="number" step="0.01" id="prodPrecioGranMayor" placeholder="0.00" />
+
+      <label for="prodImagen">Foto principal del producto (opcional)</label>
+      <input type="file" id="prodImagen" accept="image/*" />
+
+      <label for="prodCodigoBarra">Código de barra de fábrica (compartido entre tonos, opcional)</label>
+      <input type="text" id="prodCodigoBarra" placeholder="Ej: 7708089795352" />
+
+      <h2 style="margin-top:20px;">Tonos / variantes</h2>
+      <p class="sub" style="margin:0 0 10px;">Agrega al menos uno. Si el producto no tiene variedad de color, deja el nombre como "Único".</p>
+      <div id="tonosContainer"></div>
+      <button type="button" class="btn-ghost" id="agregarTonoBtn" style="margin-top:8px; width:100%;">+ Agregar otro tono</button>
+
+      <button class="btn-confirm" id="guardarProductoBtn" style="margin-top:20px;">Guardar producto</button>
+      <p id="productoStatus"></p>
+    </div>
+
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Buscar producto (ej: labial)..." />
+    </div>
+    <div class="results" id="results">
+      <div class="empty-msg">Escribe arriba para buscar productos.</div>
+    </div>
+
+    <div class="cart-section">
+      <h2>Carrito</h2>
+      <div class="cart-list" id="cartList">
+        <div class="cart-empty">Todavía no has agregado productos.</div>
+      </div>
+    </div>
+
+    <div class="cliente-section">
+      <h2>Datos de la venta</h2>
+      <label for="clienteNombre">Nombre del cliente</label>
+      <input type="text" id="clienteNombre" placeholder="Ej: María Pérez" />
+      <label for="clienteTelefono">Teléfono</label>
+      <input type="text" id="clienteTelefono" placeholder="Ej: +58 414-1234567" />
+      <label for="canalVenta">Canal</label>
+      <select id="canalVenta">
+        <option value="whatsapp">WhatsApp</option>
+        <option value="web">Web</option>
+        <option value="instagram">Instagram</option>
+      </select>
+    </div>
+
+    <button class="btn-confirm" id="confirmBtn">Confirmar venta</button>
+    <p id="ventaStatus"></p>
+
+    <div class="total-bar">
+      <span class="label">Total</span>
+      <span class="amount" id="cartTotal">$0.00</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://pvlpawwimdbxsvgggima.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_dqOJoYPxXWIQojgdxC6IKg_jE_jhTzh";
+
+  let supabaseClient = null;
+  let cart = []; // { producto_id, nombre, cantidad, nivel, precio_unitario }
+
+  const loginView = document.getElementById('loginView');
+  const panelView = document.getElementById('panelView');
+  const form = document.getElementById('loginForm');
+  const statusEl = document.getElementById('status');
+  const submitBtn = document.getElementById('submitBtn');
+  const diagEl = document.getElementById('diag');
+  const whoEmail = document.getElementById('whoEmail');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const searchInput = document.getElementById('searchInput');
+  const resultsEl = document.getElementById('results');
+  const cartListEl = document.getElementById('cartList');
+  const cartTotalEl = document.getElementById('cartTotal');
+
+  function showStatus(msg, type) { statusEl.textContent = msg; statusEl.className = type || ''; }
+  function diag(msg) { diagEl.textContent += msg + '\n'; }
+
+  function initSupabaseClient() {
+    if (!window.supabase) {
+      showStatus('No se pudo cargar la librería de Supabase. Revisa tu conexión.', 'error');
+      diag('window.supabase no existe → el script del CDN no cargó.');
+      return false;
+    }
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      return true;
+    } catch (err) {
+      showStatus('Error creando el cliente de Supabase: ' + err.message, 'error');
+      return false;
+    }
+  }
+
+  function showPanel(user) {
+    loginView.style.display = 'none';
+    panelView.style.display = 'flex';
+    whoEmail.textContent = user.email;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    handleLogin();
+  });
+
+  async function handleLogin() {
+    if (!supabaseClient && !initSupabaseClient()) return;
+
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    submitBtn.disabled = true;
+    showStatus('Entrando...', '');
+
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        showStatus('No se pudo entrar: ' + error.message, 'error');
+        return;
+      }
+      showStatus('', '');
+      showPanel(data.user);
+    } catch (err) {
+      showStatus('Error inesperado: ' + err.message, 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+
+  logoutBtn.addEventListener('click', async function () {
+    if (supabaseClient) await supabaseClient.auth.signOut();
+    cart = [];
+    renderCart();
+    panelView.style.display = 'none';
+    loginView.style.display = 'flex';
+    form.reset();
+  });
+
+  // --- Buscador de productos (agrupado por producto, con tonos desplegables) ---
+  let searchTimer = null;
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 300);
+  });
+
+  async function runSearch() {
+    const term = searchInput.value.trim();
+    if (!term) {
+      resultsEl.innerHTML = '<div class="empty-msg">Escribe arriba para buscar productos.</div>';
+      return;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('precios_actuales')
+      .select('*')
+      .ilike('nombre', '%' + term + '%')
+      .order('nombre')
+      .limit(80);
+
+    if (error) {
+      resultsEl.innerHTML = '<div class="empty-msg">Error buscando: ' + error.message + '</div>';
+      return;
+    }
+    if (!data || data.length === 0) {
+      resultsEl.innerHTML = '<div class="empty-msg">Sin resultados para "' + term + '".</div>';
+      return;
+    }
+
+    // Agrupar todas las filas (una por tono) bajo su producto
+    const porProducto = {};
+    data.forEach(function (row) {
+      if (!porProducto[row.producto_id]) {
+        porProducto[row.producto_id] = { producto_id: row.producto_id, nombre: row.nombre, variantes: [] };
+      }
+      porProducto[row.producto_id].variantes.push(row);
+    });
+
+    const productosArr = Object.values(porProducto).slice(0, 12);
+    resultsEl.innerHTML = '';
+    let tonosAbiertos = null; // solo un producto con tonos abierto a la vez
+
+    productosArr.forEach(function (prod) {
+      const card = document.createElement('div');
+      card.className = 'result-item result-card';
+
+      const esSimple = prod.variantes.length === 1 && prod.variantes[0].tono === 'Único';
+
+      if (esSimple) {
+        // Producto sin variedad real de tono: agregar directo, sin desplegable
+        const v = prod.variantes[0];
+        const agotado = v.cantidad_disponible <= 0;
+        card.innerHTML =
+          '<div class="result-header">' +
+            '<div class="info">' +
+              '<div class="name">' + prod.nombre + '</div>' +
+              '<div class="prices">Detal $' + v.precio_detal + ' · Mayor $' + v.precio_mayor + ' · Gran mayor $' + v.precio_gran_mayor + '</div>' +
+              '<div class="tono-stock">' + (agotado ? 'Agotado' : v.cantidad_disponible + ' disponibles') + '</div>' +
+            '</div>' +
+            '<div class="addrow">' +
+              '<input type="number" class="qty-input" min="1" max="' + v.cantidad_disponible + '" value="1" ' + (agotado ? 'disabled' : '') + ' />' +
+              '<button class="btn-add" ' + (agotado ? 'disabled' : '') + '>Agregar</button>' +
+            '</div>' +
+          '</div>';
+
+        const qtyInput = card.querySelector('.qty-input');
+        const addBtn = card.querySelector('.btn-add');
+        addBtn.addEventListener('click', function () {
+          const cantidad = parseInt(qtyInput.value, 10) || 1;
+          if (cantidad > v.cantidad_disponible) { alert('Solo hay ' + v.cantidad_disponible + ' unidades disponibles.'); return; }
+          addToCart(v, cantidad);
+        });
+
+        resultsEl.appendChild(card);
+        return;
+      }
+
+      // Producto CON variedad de tonos: tarjeta + desplegable
+      const totalStock = prod.variantes.reduce(function (s, v) { return s + v.cantidad_disponible; }, 0);
+
+      card.innerHTML =
+        '<div class="result-header">' +
+          '<div class="info">' +
+            '<div class="name">' + prod.nombre + '</div>' +
+            '<div class="prices">' + prod.variantes.length + ' tonos · ' + totalStock + ' unidades en total</div>' +
+          '</div>' +
+          '<button class="btn-add btn-toggle-tonos">Ver tonos</button>' +
+        '</div>' +
+        '<div class="tonos-list" style="display:none;"></div>';
+
+      const toggleBtn = card.querySelector('.btn-toggle-tonos');
+      const tonosList = card.querySelector('.tonos-list');
+
+      toggleBtn.addEventListener('click', function () {
+        const abierto = tonosList.style.display !== 'none';
+        // Acordeón: cerrar cualquier otro que estuviera abierto
+        if (!abierto && tonosAbiertos && tonosAbiertos !== tonosList) {
+          tonosAbiertos.style.display = 'none';
+          tonosAbiertos.previousElementSibling ? null : null;
+          document.querySelectorAll('.btn-toggle-tonos').forEach(function (b) { b.textContent = 'Ver tonos'; });
+        }
+        tonosList.style.display = abierto ? 'none' : 'block';
+        toggleBtn.textContent = abierto ? 'Ver tonos' : 'Ocultar';
+        tonosAbiertos = abierto ? null : tonosList;
+      });
+
+      prod.variantes.forEach(function (v) {
+        const agotado = v.cantidad_disponible <= 0;
+        const row = document.createElement('div');
+        row.className = 'tono-row';
+        row.innerHTML =
+          '<div class="tono-info">' +
+            '<span class="tono-name">' + v.tono + '</span>' +
+            '<span class="tono-stock">' + (agotado ? 'Agotado' : v.cantidad_disponible + ' disp.') + '</span>' +
+            '<span class="tono-precio">Detal $' + v.precio_detal + ' · Mayor $' + v.precio_mayor + ' · G.Mayor $' + v.precio_gran_mayor + '</span>' +
+          '</div>' +
+          '<div class="addrow">' +
+            '<input type="number" class="qty-input" min="1" max="' + v.cantidad_disponible + '" value="1" ' + (agotado ? 'disabled' : '') + ' />' +
+            '<button class="btn-add" ' + (agotado ? 'disabled' : '') + '>Agregar</button>' +
+          '</div>';
+
+        const qtyInput = row.querySelector('.qty-input');
+        const addBtn = row.querySelector('.btn-add');
+        addBtn.addEventListener('click', function () {
+          const cantidad = parseInt(qtyInput.value, 10) || 1;
+          if (cantidad > v.cantidad_disponible) {
+            alert('Solo hay ' + v.cantidad_disponible + ' unidades disponibles de este tono.');
+            return;
+          }
+          addToCart(v, cantidad);
+        });
+
+        tonosList.appendChild(row);
+      });
+
+      resultsEl.appendChild(card);
+    });
+  }
+
+  // --- Carrito ---
+  // Guardamos los 3 precios y los umbrales de CADA producto en la línea,
+  // sin decidir el nivel todavía. El nivel se calcula recién en
+  // calcularCarrito(), porque depende de TODO el carrito junto, no solo
+  // de esta línea.
+  function addToCart(variante, cantidad) {
+    cart.push({
+      variante_id: variante.variante_id,
+      producto_id: variante.producto_id,
+      nombre: variante.nombre,
+      tono: variante.tono,
+      cantidad: cantidad,
+      precio_detal: variante.precio_detal,
+      precio_mayor: variante.precio_mayor,
+      precio_gran_mayor: variante.precio_gran_mayor,
+      umbral_mayor: variante.umbral_mayor,
+      umbral_gran_mayor: variante.umbral_gran_mayor
+    });
+    renderCart();
+  }
+
+  function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+  }
+
+  // Reglas reales del negocio:
+  // - "mayor": una línea individual llega a mayor si SU cantidad
+  //   alcanza el umbral_mayor (ej: 3+ del mismo producto).
+  // - "gran_mayor": si la SUMA de unidades de TODO el carrito alcanza
+  //   el umbral_gran_mayor (ej: 10 items surtidos), entonces TODO el
+  //   carrito se sube a gran_mayor, sin importar la cantidad de cada
+  //   línea por separado.
+  function calcularCarrito() {
+    const totalUnidades = cart.reduce(function (sum, item) { return sum + item.cantidad; }, 0);
+    const umbralGranMayor = cart.length > 0 ? cart[0].umbral_gran_mayor : Infinity;
+    const carritoEsGranMayor = totalUnidades >= umbralGranMayor;
+
+    const lineas = cart.map(function (item) {
+      let nivel, precio;
+      if (carritoEsGranMayor) {
+        nivel = 'gran_mayor';
+        precio = item.precio_gran_mayor;
+      } else if (item.cantidad >= item.umbral_mayor) {
+        nivel = 'mayor';
+        precio = item.precio_mayor;
+      } else {
+        nivel = 'detal';
+        precio = item.precio_detal;
+      }
+      const nombreCompleto = item.tono && item.tono !== 'Único' ? item.nombre + ' (' + item.tono + ')' : item.nombre;
+      return {
+        nombre: nombreCompleto,
+        cantidad: item.cantidad,
+        nivel: nivel,
+        precio_unitario: precio,
+        subtotal: item.cantidad * precio
+      };
+    });
+
+    const total = lineas.reduce(function (sum, l) { return sum + l.subtotal; }, 0);
+    return { lineas, total, totalUnidades, carritoEsGranMayor };
+  }
+
+  function renderCart() {
+    if (cart.length === 0) {
+      cartListEl.innerHTML = '<div class="cart-empty">Todavía no has agregado productos.</div>';
+      cartTotalEl.textContent = '$0.00';
+      return;
+    }
+
+    const { lineas, total, carritoEsGranMayor } = calcularCarrito();
+    cartListEl.innerHTML = '';
+
+    if (carritoEsGranMayor) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'font-size:12px; color:var(--wine); font-weight:600; margin-bottom:4px;';
+      banner.textContent = '🎉 El carrito alcanzó Gran Mayor — todo el pedido quedó a ese precio.';
+      cartListEl.appendChild(banner);
+    }
+
+    lineas.forEach(function (l, index) {
+      const row = document.createElement('div');
+      row.className = 'cart-row';
+      row.innerHTML =
+        '<div>' +
+          l.nombre + ' × ' + l.cantidad +
+          '<div class="meta">' + l.nivel + ' · $' + l.precio_unitario.toFixed(2) + ' c/u</div>' +
+        '</div>' +
+        '<div style="display:flex; align-items:center; gap:10px;">' +
+          '<strong>$' + l.subtotal.toFixed(2) + '</strong>' +
+          '<button class="remove" data-index="' + index + '">Quitar</button>' +
+        '</div>';
+
+      row.querySelector('.remove').addEventListener('click', function () {
+        removeFromCart(index);
+      });
+
+      cartListEl.appendChild(row);
+    });
+
+    cartTotalEl.textContent = '$' + total.toFixed(2);
+  }
+
+  // --- Confirmar venta: escribe todo en Supabase ---
+  const confirmBtn = document.getElementById('confirmBtn');
+  const ventaStatusEl = document.getElementById('ventaStatus');
+
+  function showVentaStatus(msg, type) {
+    ventaStatusEl.textContent = msg;
+    ventaStatusEl.className = type || '';
+  }
+
+  confirmBtn.addEventListener('click', async function () {
+    if (cart.length === 0) {
+      showVentaStatus('Agrega al menos un producto al carrito.', 'error');
+      return;
+    }
+
+    const nombre = document.getElementById('clienteNombre').value.trim();
+    const telefono = document.getElementById('clienteTelefono').value.trim();
+    const canal = document.getElementById('canalVenta').value;
+
+    if (!nombre) {
+      showVentaStatus('Ingresa el nombre del cliente.', 'error');
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    showVentaStatus('Guardando venta...', '');
+
+    try {
+      // 1) Buscar cliente existente por teléfono (si dio uno)
+      let clienteId = null;
+
+      if (telefono) {
+        const { data: existentes, error: buscarError } = await supabaseClient
+          .from('clientes')
+          .select('id')
+          .eq('telefono', telefono)
+          .limit(1);
+
+        if (buscarError) throw buscarError;
+        if (existentes && existentes.length > 0) {
+          clienteId = existentes[0].id;
+        }
+      }
+
+      // 2) Si no existe, crear el cliente
+      if (!clienteId) {
+        const { data: nuevoCliente, error: crearError } = await supabaseClient
+          .from('clientes')
+          .insert({ nombre: nombre, telefono: telefono || null })
+          .select('id')
+          .single();
+
+        if (crearError) throw crearError;
+        clienteId = nuevoCliente.id;
+      }
+
+      // 3) Crear la venta (cabecera)
+      const { data: nuevaVenta, error: ventaError } = await supabaseClient
+        .from('ventas')
+        .insert({ cliente_id: clienteId, canal: canal, estado: 'pendiente_pago' })
+        .select('id')
+        .single();
+
+      if (ventaError) throw ventaError;
+      const ventaId = nuevaVenta.id;
+
+      // 4) Insertar cada línea del carrito, con el precio YA calculado
+      const { lineas } = calcularCarrito();
+      const itemsParaInsertar = cart.map(function (item, index) {
+        return {
+          venta_id: ventaId,
+          variante_id: item.variante_id,
+          cantidad: item.cantidad,
+          nivel_precio_aplicado: lineas[index].nivel,
+          precio_unitario: lineas[index].precio_unitario
+        };
+      });
+
+      const { error: itemsError } = await supabaseClient
+        .from('venta_items')
+        .insert(itemsParaInsertar);
+
+      if (itemsError) throw itemsError;
+
+      // 5) Todo salió bien: limpiar y avisar
+      showVentaStatus('Venta #' + ventaId + ' guardada correctamente.', 'ok');
+      cart = [];
+      renderCart();
+      document.getElementById('clienteNombre').value = '';
+      document.getElementById('clienteTelefono').value = '';
+
+    } catch (err) {
+      showVentaStatus('Error guardando la venta: ' + err.message, 'error');
+    } finally {
+      confirmBtn.disabled = false;
+    }
+  });
+
+  // --- Configuración: tasa de cambio y márgenes ---
+  const toggleConfigBtn = document.getElementById('toggleConfigBtn');
+  const configForm = document.getElementById('configForm');
+  const tasaActualTexto = document.getElementById('tasaActualTexto');
+
+  toggleConfigBtn.addEventListener('click', async function () {
+    const visible = configForm.style.display !== 'none';
+    configForm.style.display = visible ? 'none' : 'block';
+    if (!visible) await cargarConfigActual();
+  });
+
+  async function cargarConfigActual() {
+    tasaActualTexto.textContent = 'Cargando...';
+    try {
+      const { data: tasa, error: tasaError } = await supabaseClient
+        .from('tasas_cambio').select('*').order('fecha', { ascending: false }).limit(1).single();
+      if (tasaError) throw tasaError;
+
+      tasaActualTexto.textContent =
+        'Última tasa (' + tasa.fecha + '): BCV ' + tasa.tasa_bcv + ' · Binance ' + tasa.tasa_binance_p2p +
+        ' → Colchón actual: ' + tasa.colchon_pct + '%';
+      document.getElementById('cfgTasaBcv').value = tasa.tasa_bcv;
+      document.getElementById('cfgTasaBinance').value = tasa.tasa_binance_p2p;
+
+      const { data: config, error: configError } = await supabaseClient
+        .from('config_precios').select('*').order('actualizado_en', { ascending: false }).limit(1).single();
+      if (configError) throw configError;
+
+      document.getElementById('cfgMargenDetal').value = config.margen_detal_pct;
+      document.getElementById('cfgMargenMayor').value = config.margen_mayor_pct;
+      document.getElementById('cfgMargenGranMayor').value = config.margen_gran_mayor_pct;
+    } catch (err) {
+      tasaActualTexto.textContent = 'Error cargando: ' + err.message;
+    }
+  }
+
+  document.getElementById('guardarTasaBtn').addEventListener('click', async function () {
+    const bcv = parseFloat(document.getElementById('cfgTasaBcv').value);
+    const binance = parseFloat(document.getElementById('cfgTasaBinance').value);
+    const statusEl2 = document.getElementById('tasaStatus');
+
+    if (isNaN(bcv) || isNaN(binance) || bcv <= 0 || binance <= 0) {
+      statusEl2.textContent = 'Ingresa ambas tasas, mayores a 0.';
+      statusEl2.className = 'error';
+      return;
+    }
+
+    try {
+      const { error } = await supabaseClient
+        .from('tasas_cambio').insert({ tasa_bcv: bcv, tasa_binance_p2p: binance });
+      if (error) throw error;
+      statusEl2.textContent = 'Tasa guardada. El colchón se recalculó solo.';
+      statusEl2.className = 'ok';
+      await cargarConfigActual();
+    } catch (err) {
+      statusEl2.textContent = 'Error: ' + err.message;
+      statusEl2.className = 'error';
+    }
+  });
+
+  document.getElementById('guardarMargenesBtn').addEventListener('click', async function () {
+    const detal = parseFloat(document.getElementById('cfgMargenDetal').value);
+    const mayor = parseFloat(document.getElementById('cfgMargenMayor').value);
+    const granMayor = parseFloat(document.getElementById('cfgMargenGranMayor').value);
+    const statusEl3 = document.getElementById('margenesStatus');
+
+    if ([detal, mayor, granMayor].some(isNaN)) {
+      statusEl3.textContent = 'Completa los 3 márgenes.';
+      statusEl3.className = 'error';
+      return;
+    }
+
+    try {
+      const { data: config, error: findError } = await supabaseClient
+        .from('config_precios').select('id').order('actualizado_en', { ascending: false }).limit(1).single();
+      if (findError) throw findError;
+
+      const { error } = await supabaseClient
+        .from('config_precios')
+        .update({
+          margen_detal_pct: detal,
+          margen_mayor_pct: mayor,
+          margen_gran_mayor_pct: granMayor,
+          actualizado_en: new Date().toISOString()
+        })
+        .eq('id', config.id);
+      if (error) throw error;
+
+      statusEl3.textContent = 'Márgenes actualizados. Los próximos productos sugeridos usarán estos %.';
+      statusEl3.className = 'ok';
+    } catch (err) {
+      statusEl3.textContent = 'Error: ' + err.message;
+      statusEl3.className = 'error';
+    }
+  });
+  const toggleProductoBtn = document.getElementById('toggleProductoBtn');
+  const productoForm = document.getElementById('productoForm');
+  const guardarProductoBtn = document.getElementById('guardarProductoBtn');
+  const productoStatusEl = document.getElementById('productoStatus');
+
+  function showProductoStatus(msg, type) {
+    productoStatusEl.textContent = msg;
+    productoStatusEl.className = type || '';
+  }
+
+  toggleProductoBtn.addEventListener('click', function () {
+    const visible = productoForm.style.display !== 'none';
+    productoForm.style.display = visible ? 'none' : 'block';
+  });
+
+  // --- Filas de tono dinámicas ---
+  const tonosContainer = document.getElementById('tonosContainer');
+  const agregarTonoBtn = document.getElementById('agregarTonoBtn');
+
+  function crearFilaTono(nombreDefault) {
+    const div = document.createElement('div');
+    div.className = 'tono-form-row';
+    div.innerHTML =
+      '<input type="text" class="tono-nombre" placeholder="Tono (ej: 01, Rojo Pasión, o Único)" value="' + (nombreDefault || '') + '" />' +
+      '<input type="number" class="tono-cantidad" placeholder="Cantidad disponible" min="0" value="0" />' +
+      '<input type="text" class="tono-codigo-interno" placeholder="Código interno (opcional, único para este tono)" />' +
+      '<input type="file" class="tono-imagen" accept="image/*" />' +
+      '<button type="button" class="quitar-tono-btn">Quitar este tono</button>';
+
+    div.querySelector('.quitar-tono-btn').addEventListener('click', function () {
+      div.remove();
+    });
+    return div;
+  }
+
+  function resetTonos() {
+    tonosContainer.innerHTML = '';
+    tonosContainer.appendChild(crearFilaTono('Único'));
+  }
+
+  agregarTonoBtn.addEventListener('click', function () {
+    tonosContainer.appendChild(crearFilaTono(''));
+  });
+
+  resetTonos(); // arranca con una fila lista
+
+  // --- Sugerir precios según costo (editable después) ---
+  const sugerirPreciosBtn = document.getElementById('sugerirPreciosBtn');
+  sugerirPreciosBtn.addEventListener('click', async function () {
+    const costoTexto = document.getElementById('prodCosto').value;
+    const costo = parseFloat(costoTexto);
+    if (isNaN(costo) || costo <= 0) {
+      showProductoStatus('Ingresa un costo válido antes de pedir la sugerencia.', 'error');
+      return;
+    }
+
+    try {
+      const { data: tasaData, error: tasaError } = await supabaseClient
+        .from('tasas_cambio').select('colchon_pct').order('fecha', { ascending: false }).limit(1).single();
+      if (tasaError) throw tasaError;
+
+      const { data: configData, error: configError } = await supabaseClient
+        .from('config_precios').select('*').order('actualizado_en', { ascending: false }).limit(1).single();
+      if (configError) throw configError;
+
+      const costoConColchon = costo * (1 + tasaData.colchon_pct / 100);
+      const detal = costoConColchon * (1 + configData.margen_detal_pct / 100);
+      const mayor = costoConColchon * (1 + configData.margen_mayor_pct / 100);
+      const granMayor = costoConColchon * (1 + configData.margen_gran_mayor_pct / 100);
+
+      document.getElementById('prodPrecioDetal').value = detal.toFixed(2);
+      document.getElementById('prodPrecioMayor').value = mayor.toFixed(2);
+      document.getElementById('prodPrecioGranMayor').value = granMayor.toFixed(2);
+      showProductoStatus('Sugerencia calculada — ajústala si quieres antes de guardar.', 'ok');
+    } catch (err) {
+      showProductoStatus('No se pudo calcular la sugerencia: ' + err.message, 'error');
+    }
+  });
+
+  // --- Guardar producto (con descripción, precios editables y foto) ---
+  guardarProductoBtn.addEventListener('click', async function () {
+    const nombre = document.getElementById('prodNombre').value.trim();
+    const descripcion = document.getElementById('prodDescripcion').value.trim();
+    const categoria = document.getElementById('prodCategoria').value.trim();
+    const costoTexto = document.getElementById('prodCosto').value;
+    const proveedorNombre = document.getElementById('prodProveedor').value.trim();
+    const precioDetal = parseFloat(document.getElementById('prodPrecioDetal').value);
+    const precioMayor = parseFloat(document.getElementById('prodPrecioMayor').value);
+    const precioGranMayor = parseFloat(document.getElementById('prodPrecioGranMayor').value);
+    const archivoImagen = document.getElementById('prodImagen').files[0];
+    const codigoBarraFabrica = document.getElementById('prodCodigoBarra').value.trim();
+    const filasTono = Array.from(tonosContainer.querySelectorAll('.tono-form-row'));
+
+    if (filasTono.length === 0) {
+      showProductoStatus('Agrega al menos un tono (usa "Único" si no aplica).', 'error');
+      return;
+    }
+
+    if (!nombre || !costoTexto) {
+      showProductoStatus('El nombre y el costo son obligatorios.', 'error');
+      return;
+    }
+    const costo = parseFloat(costoTexto);
+    if (isNaN(costo) || costo <= 0) {
+      showProductoStatus('El costo debe ser un número mayor a 0.', 'error');
+      return;
+    }
+    if (isNaN(precioDetal) || isNaN(precioMayor) || isNaN(precioGranMayor)) {
+      showProductoStatus('Usa "Sugerir precios" o ingresa los 3 precios manualmente.', 'error');
+      return;
+    }
+
+    guardarProductoBtn.disabled = true;
+    showProductoStatus('Guardando...', '');
+
+    try {
+      let proveedorId = null;
+
+      if (proveedorNombre) {
+        const { data: existentes, error: buscarError } = await supabaseClient
+          .from('proveedores').select('id').ilike('nombre', proveedorNombre).limit(1);
+        if (buscarError) throw buscarError;
+
+        if (existentes && existentes.length > 0) {
+          proveedorId = existentes[0].id;
+        } else {
+          const { data: nuevoProveedor, error: crearProvError } = await supabaseClient
+            .from('proveedores').insert({ nombre: proveedorNombre }).select('id').single();
+          if (crearProvError) throw crearProvError;
+          proveedorId = nuevoProveedor.id;
+        }
+      }
+
+      // Subir la foto, si hay una
+      let imagenUrl = null;
+      if (archivoImagen) {
+        const filePath = Date.now() + '_' + archivoImagen.name.replace(/\s+/g, '_');
+        const { error: uploadError } = await supabaseClient
+          .storage.from('productos-fotos').upload(filePath, archivoImagen);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabaseClient.storage.from('productos-fotos').getPublicUrl(filePath);
+        imagenUrl = urlData.publicUrl;
+      }
+
+      const { data: nuevoProducto, error: productoError } = await supabaseClient
+        .from('productos')
+        .insert({
+          nombre: nombre,
+          descripcion: descripcion || null,
+          categoria: categoria || null,
+          costo_base: costo,
+          precio_detal: precioDetal,
+          precio_mayor: precioMayor,
+          precio_gran_mayor: precioGranMayor,
+          proveedor_id: proveedorId,
+          imagen_url: imagenUrl,
+          codigo_barra: codigoBarraFabrica || null,
+          activo: true
+        })
+        .select('id')
+        .single();
+
+      if (productoError) throw productoError;
+
+      // Crear TODAS las variantes/tonos que armaste en el formulario
+      for (const fila of filasTono) {
+        const tonoNombre = fila.querySelector('.tono-nombre').value.trim() || 'Único';
+        const cantidad = parseInt(fila.querySelector('.tono-cantidad').value, 10) || 0;
+        const codigoInterno = fila.querySelector('.tono-codigo-interno').value.trim();
+        const archivoTono = fila.querySelector('.tono-imagen').files[0];
+
+        let imagenTonoUrl = null;
+        if (archivoTono) {
+          const rutaTono = Date.now() + '_' + tonoNombre.replace(/\s+/g, '_') + '_' + archivoTono.name.replace(/\s+/g, '_');
+          const { error: uploadTonoError } = await supabaseClient
+            .storage.from('productos-fotos').upload(rutaTono, archivoTono);
+          if (uploadTonoError) throw uploadTonoError;
+          const { data: urlTonoData } = supabaseClient.storage.from('productos-fotos').getPublicUrl(rutaTono);
+          imagenTonoUrl = urlTonoData.publicUrl;
+        }
+
+        const { error: varianteError } = await supabaseClient
+          .from('variantes')
+          .insert({
+            producto_id: nuevoProducto.id,
+            tono: tonoNombre,
+            cantidad_disponible: cantidad,
+            codigo_interno: codigoInterno || null,
+            imagen_url: imagenTonoUrl
+          });
+        if (varianteError) throw varianteError;
+      }
+
+      showProductoStatus('Producto "' + nombre + '" guardado correctamente.', 'ok');
+      document.getElementById('prodNombre').value = '';
+      document.getElementById('prodDescripcion').value = '';
+      document.getElementById('prodCategoria').value = '';
+      document.getElementById('prodCosto').value = '';
+      document.getElementById('prodProveedor').value = '';
+      document.getElementById('prodPrecioDetal').value = '';
+      document.getElementById('prodPrecioMayor').value = '';
+      document.getElementById('prodPrecioGranMayor').value = '';
+      document.getElementById('prodImagen').value = '';
+      document.getElementById('prodCodigoBarra').value = '';
+      resetTonos();
+
+    } catch (err) {
+      showProductoStatus('Error guardando el producto: ' + err.message, 'error');
+    } finally {
+      guardarProductoBtn.disabled = false;
+    }
+  });
+
+  // --- Al cargar: revisar si ya hay sesión activa ---
+  window.addEventListener('DOMContentLoaded', async function () {
+    diag('Página cargada: ' + new Date().toLocaleTimeString());
+    if (!initSupabaseClient()) return;
+
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) {
+      showPanel(data.session.user);
+    }
+  });
+</script>
+</body>
+</html>
