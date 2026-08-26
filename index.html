@@ -337,7 +337,7 @@
 
 
     <div class="search-box" style="display:flex; gap:8px; align-items:center;">
-      <input type="text" id="searchInput" placeholder="Buscar producto (ej: labial)..." style="flex:1;" />
+      <input type="text" id="searchInput" placeholder="Buscar por nombre, marca o código..." style="flex:1;" />
       <button type="button" class="btn-ghost" id="scanSearchBtn" title="Escanear código con la cámara">📷</button>
     </div>
     <div id="scannerBox" style="display:none; margin-bottom:18px; border:1px solid var(--line); border-radius:10px; padding:10px;">
@@ -481,7 +481,7 @@
     const { data, error } = await supabaseClient
       .from('precios_actuales')
       .select('*')
-      .or('nombre.ilike.%' + term + '%,codigo_barra.ilike.%' + term + '%,codigo_interno.ilike.%' + term + '%')
+      .or('nombre.ilike.%' + term + '%,marca.ilike.%' + term + '%,codigo_barra.ilike.%' + term + '%,codigo_interno.ilike.%' + term + '%')
       .order('nombre')
       .limit(80);
 
