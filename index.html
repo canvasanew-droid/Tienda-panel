@@ -127,6 +127,13 @@
   #productoStatus { margin-top:10px; font-size:13px; }
   #productoStatus.error { color:var(--error); }
   #productoStatus.ok { color:var(--ok); }
+  #clienteStatus { margin-top:12px; font-size:14px; }
+  #clienteStatus.error { color:var(--error); }
+  #clienteStatus.ok { color:var(--ok); }
+  .cliente-row {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px;
+  }
 
   .tono-form-row {
     border:1.5px dashed var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
@@ -170,10 +177,33 @@
         <div class="who">Conectado como <strong id="whoEmail"></strong></div>
       </div>
       <div style="display:flex; gap:8px;">
+        <button class="btn-ghost" id="toggleClienteBtn">Clientes</button>
         <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
         <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
         <button class="btn-ghost" id="logoutBtn">Cerrar sesión</button>
       </div>
+    </div>
+
+    <div class="producto-form" id="clienteForm" style="display:none;">
+      <h2>Buscar cliente</h2>
+      <label for="clienteBuscarInput">Nombre o teléfono</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="clienteBuscarInput" placeholder="Ej: Maria o 0414..." style="flex:1;" />
+        <button type="button" class="btn-ghost" id="clienteBuscarBtn">Buscar</button>
+      </div>
+      <div id="clienteResultados" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;"></div>
+
+      <div id="clienteEditForm" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--line);">
+        <h2>Editar cliente</h2>
+        <label for="clienteEditNombre">Nombre</label>
+        <input type="text" id="clienteEditNombre" />
+        <label for="clienteEditTelefono">Teléfono</label>
+        <input type="text" id="clienteEditTelefono" />
+        <label for="clienteEditNotas">Notas</label>
+        <textarea id="clienteEditNotas" rows="2" placeholder="Ej: cliente fiel, revendedora..."></textarea>
+        <button type="button" class="btn-confirm" id="guardarClienteBtn" style="margin-top:12px;">Guardar cambios</button>
+      </div>
+      <p id="clienteStatus"></p>
     </div>
 
     <div class="producto-form" id="configForm" style="display:none;">
@@ -718,6 +748,121 @@
   const toggleConfigBtn = document.getElementById('toggleConfigBtn');
   const configForm = document.getElementById('configForm');
   const tasaActualTexto = document.getElementById('tasaActualTexto');
+
+  // --- Clientes: buscar y editar ---
+  const toggleClienteBtn = document.getElementById('toggleClienteBtn');
+  const clienteForm = document.getElementById('clienteForm');
+  const clienteBuscarBtn = document.getElementById('clienteBuscarBtn');
+  const clienteBuscarInput = document.getElementById('clienteBuscarInput');
+  const clienteResultados = document.getElementById('clienteResultados');
+  const clienteEditForm = document.getElementById('clienteEditForm');
+  const clienteEditNombre = document.getElementById('clienteEditNombre');
+  const clienteEditTelefono = document.getElementById('clienteEditTelefono');
+  const clienteEditNotas = document.getElementById('clienteEditNotas');
+  const guardarClienteBtn = document.getElementById('guardarClienteBtn');
+  const clienteStatusEl = document.getElementById('clienteStatus');
+  let clienteEditandoId = null;
+
+  function showClienteStatus(msg, type) {
+    clienteStatusEl.textContent = msg;
+    clienteStatusEl.className = type || '';
+  }
+
+  toggleClienteBtn.addEventListener('click', function () {
+    const visible = clienteForm.style.display !== 'none';
+    clienteForm.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+      // Al abrir la sección, empezamos limpios: sin búsqueda previa
+      // ni formulario de edición abierto de una sesión anterior.
+      clienteBuscarInput.value = '';
+      clienteResultados.innerHTML = '';
+      clienteEditForm.style.display = 'none';
+      clienteEditandoId = null;
+      showClienteStatus('', '');
+    }
+  });
+
+  clienteBuscarBtn.addEventListener('click', async function () {
+    const termino = clienteBuscarInput.value.trim();
+    if (!termino) {
+      showClienteStatus('Escribe un nombre o teléfono para buscar.', 'error');
+      return;
+    }
+
+    showClienteStatus('Buscando...', '');
+    clienteResultados.innerHTML = '';
+    clienteEditForm.style.display = 'none';
+
+    const { data, error } = await supabaseClient
+      .from('clientes')
+      .select('id, nombre, telefono, notas')
+      .or('nombre.ilike.%' + termino + '%,telefono.ilike.%' + termino + '%')
+      .limit(10);
+
+    if (error) {
+      showClienteStatus('Error buscando: ' + error.message, 'error');
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      showClienteStatus('No se encontró ningún cliente con ese nombre o teléfono.', '');
+      return;
+    }
+
+    showClienteStatus('', '');
+    data.forEach(function (cliente) {
+      const row = document.createElement('div');
+      row.className = 'cliente-row';
+      row.innerHTML =
+        '<div>' +
+          '<div><strong>' + cliente.nombre + '</strong></div>' +
+          '<div style="color:#6B5E5A;">' + (cliente.telefono || 'Sin teléfono') + '</div>' +
+        '</div>' +
+        '<button type="button" class="btn-ghost btn-editar-cliente">Editar</button>';
+
+      row.querySelector('.btn-editar-cliente').addEventListener('click', function () {
+        clienteEditandoId = cliente.id;
+        clienteEditNombre.value = cliente.nombre || '';
+        clienteEditTelefono.value = cliente.telefono || '';
+        clienteEditNotas.value = cliente.notas || '';
+        clienteEditForm.style.display = 'block';
+        showClienteStatus('', '');
+      });
+
+      clienteResultados.appendChild(row);
+    });
+  });
+
+  guardarClienteBtn.addEventListener('click', async function () {
+    if (!clienteEditandoId) return;
+
+    const nombre = clienteEditNombre.value.trim();
+    if (!nombre) {
+      showClienteStatus('El nombre no puede quedar vacío.', 'error');
+      return;
+    }
+
+    guardarClienteBtn.disabled = true;
+    showClienteStatus('Guardando...', '');
+
+    const { error } = await supabaseClient
+      .from('clientes')
+      .update({
+        nombre: nombre,
+        telefono: clienteEditTelefono.value.trim() || null,
+        notas: clienteEditNotas.value.trim() || null
+      })
+      .eq('id', clienteEditandoId);
+
+    guardarClienteBtn.disabled = false;
+
+    if (error) {
+      showClienteStatus('Error guardando: ' + error.message, 'error');
+      return;
+    }
+
+    showClienteStatus('Cliente actualizado correctamente.', 'ok');
+  });
 
   toggleConfigBtn.addEventListener('click', async function () {
     const visible = configForm.style.display !== 'none';
