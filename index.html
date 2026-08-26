@@ -658,21 +658,12 @@
         clienteId = nuevoCliente.id;
       }
 
-      // 3) Crear la venta (cabecera)
-      const { data: nuevaVenta, error: ventaError } = await supabaseClient
-        .from('ventas')
-        .insert({ cliente_id: clienteId, canal: canal, estado: 'pendiente_pago' })
-        .select('id')
-        .single();
-
-      if (ventaError) throw ventaError;
-      const ventaId = nuevaVenta.id;
-
-      // 4) Insertar cada línea del carrito, con el precio YA calculado
+      // 3) Confirmar la venta completa (venta + items + descuento de stock)
+      // en una sola llamada atómica a la base de datos. Si no hay stock
+      // suficiente de alguna variante, el RPC falla y no se guarda nada.
       const { lineas } = calcularCarrito();
-      const itemsParaInsertar = cart.map(function (item, index) {
+      const itemsParaEnviar = cart.map(function (item, index) {
         return {
-          venta_id: ventaId,
           variante_id: item.variante_id,
           cantidad: item.cantidad,
           nivel_precio_aplicado: lineas[index].nivel,
@@ -680,13 +671,16 @@
         };
       });
 
-      const { error: itemsError } = await supabaseClient
-        .from('venta_items')
-        .insert(itemsParaInsertar);
+      const { data: ventaId, error: ventaError } = await supabaseClient
+        .rpc('confirm_sale', {
+          p_cliente_id: clienteId,
+          p_canal: canal,
+          p_items: itemsParaEnviar
+        });
 
-      if (itemsError) throw itemsError;
+      if (ventaError) throw ventaError;
 
-      // 5) Todo salió bien: limpiar y avisar
+      // 4) Todo salió bien: limpiar y avisar
       showVentaStatus('Venta #' + ventaId + ' guardada correctamente.', 'ok');
       cart = [];
       renderCart();
