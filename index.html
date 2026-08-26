@@ -134,6 +134,12 @@
     display:flex; justify-content:space-between; align-items:center; gap:10px;
     padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px;
   }
+  .prod-imagen-actual { font-size:13px; color:#6B5E5A; margin-bottom:4px; }
+  .prod-imagen-actual img, .tono-imagen-actual img {
+    width:48px; height:48px; object-fit:cover; border-radius:6px; vertical-align:middle; margin-right:8px;
+  }
+  .tono-form-row.editing { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
+  .tono-imagen-actual { font-size:12px; color:#6B5E5A; margin:4px 0; }
 
   .tono-form-row {
     border:1.5px dashed var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
@@ -180,6 +186,7 @@
         <button class="btn-ghost" id="toggleClienteBtn">Clientes</button>
         <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
         <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
+        <button class="btn-ghost" id="toggleEditarProductoBtn">Editar producto</button>
         <button class="btn-ghost" id="logoutBtn">Cerrar sesión</button>
       </div>
     </div>
@@ -264,6 +271,62 @@
 
       <button class="btn-confirm" id="guardarProductoBtn" style="margin-top:20px;">Guardar producto</button>
       <p id="productoStatus"></p>
+    </div>
+
+    <div class="producto-form" id="editProductoForm" style="display:none;">
+      <h2>Buscar producto para editar</h2>
+      <label for="editProdBuscarInput">Nombre del producto</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="editProdBuscarInput" placeholder="Ej: labial" style="flex:1;" />
+        <button type="button" class="btn-ghost" id="editProdBuscarBtn">Buscar</button>
+      </div>
+      <div id="editProdResultados" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;"></div>
+
+      <div id="editProdCampos" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--line);">
+        <h2>Editar producto</h2>
+        <label for="editProdNombre">Nombre</label>
+        <input type="text" id="editProdNombre" />
+
+        <label for="editProdDescripcion">Descripción (para el cliente)</label>
+        <textarea id="editProdDescripcion" rows="3"></textarea>
+
+        <label for="editProdCategoria">Categoría</label>
+        <input type="text" id="editProdCategoria" />
+        <label for="editProdCosto">Costo base (USD, sin colchón ni margen)</label>
+        <input type="number" step="0.01" id="editProdCosto" />
+        <label for="editProdProveedor">Proveedor</label>
+        <input type="text" id="editProdProveedor" />
+
+        <button type="button" class="btn-ghost" id="editSugerirPreciosBtn" style="margin-top:14px; width:100%;">Sugerir precios según el costo</button>
+
+        <label for="editProdPrecioDetal">Precio detal</label>
+        <input type="number" step="0.01" id="editProdPrecioDetal" />
+        <label for="editProdPrecioMayor">Precio mayor</label>
+        <input type="number" step="0.01" id="editProdPrecioMayor" />
+        <label for="editProdPrecioGranMayor">Precio gran mayor</label>
+        <input type="number" step="0.01" id="editProdPrecioGranMayor" />
+
+        <label>Foto principal actual</label>
+        <div id="editProdImagenActual" class="prod-imagen-actual">Sin foto</div>
+        <label for="editProdImagen">Reemplazar foto (opcional)</label>
+        <input type="file" id="editProdImagen" accept="image/*" />
+
+        <label for="editProdCodigoBarra">Código de barra de fábrica</label>
+        <input type="text" id="editProdCodigoBarra" />
+
+        <label style="display:flex; align-items:center; gap:8px; margin-top:16px;">
+          <input type="checkbox" id="editProdActivo" style="width:auto; margin:0;" />
+          Producto activo (visible en la tienda)
+        </label>
+
+        <h2 style="margin-top:20px;">Tonos / variantes</h2>
+        <p class="sub" style="margin:0 0 10px;">Corrige el stock, código o foto de cada tono. También puedes agregar tonos nuevos.</p>
+        <div id="editTonosContainer"></div>
+        <button type="button" class="btn-ghost" id="editAgregarTonoBtn" style="margin-top:8px; width:100%;">+ Agregar otro tono</button>
+
+        <button class="btn-confirm" id="guardarEdicionProductoBtn" style="margin-top:20px;">Guardar cambios</button>
+      </div>
+      <p id="editProductoStatus"></p>
     </div>
 
 
@@ -1168,7 +1231,348 @@
     }
   });
 
-  // --- Al cargar: revisar si ya hay sesión activa ---
+  // --- Editar producto: buscar, cargar tonos, guardar cambios ---
+  const toggleEditarProductoBtn = document.getElementById('toggleEditarProductoBtn');
+  const editProductoForm = document.getElementById('editProductoForm');
+  const editProdBuscarBtn = document.getElementById('editProdBuscarBtn');
+  const editProdBuscarInput = document.getElementById('editProdBuscarInput');
+  const editProdResultados = document.getElementById('editProdResultados');
+  const editProdCampos = document.getElementById('editProdCampos');
+  const editTonosContainer = document.getElementById('editTonosContainer');
+  const editAgregarTonoBtn = document.getElementById('editAgregarTonoBtn');
+  const guardarEdicionProductoBtn = document.getElementById('guardarEdicionProductoBtn');
+  const editProductoStatusEl = document.getElementById('editProductoStatus');
+  let productoEditandoId = null;
+  let imagenProductoActualUrl = null; // para poder borrarla si se reemplaza
+
+  function showEditProductoStatus(msg, type) {
+    editProductoStatusEl.textContent = msg;
+    editProductoStatusEl.className = type || '';
+  }
+
+  toggleEditarProductoBtn.addEventListener('click', function () {
+    const visible = editProductoForm.style.display !== 'none';
+    editProductoForm.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+      editProdBuscarInput.value = '';
+      editProdResultados.innerHTML = '';
+      editProdCampos.style.display = 'none';
+      productoEditandoId = null;
+      showEditProductoStatus('', '');
+    }
+  });
+
+  editProdBuscarBtn.addEventListener('click', async function () {
+    const termino = editProdBuscarInput.value.trim();
+    if (!termino) {
+      showEditProductoStatus('Escribe el nombre del producto a buscar.', 'error');
+      return;
+    }
+
+    showEditProductoStatus('Buscando...', '');
+    editProdResultados.innerHTML = '';
+    editProdCampos.style.display = 'none';
+
+    const { data, error } = await supabaseClient
+      .from('productos')
+      .select('id, nombre, categoria')
+      .ilike('nombre', '%' + termino + '%')
+      .limit(10);
+
+    if (error) {
+      showEditProductoStatus('Error buscando: ' + error.message, 'error');
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      showEditProductoStatus('No se encontró ningún producto con ese nombre.', '');
+      return;
+    }
+
+    showEditProductoStatus('', '');
+    data.forEach(function (producto) {
+      const row = document.createElement('div');
+      row.className = 'cliente-row';
+      row.innerHTML =
+        '<div>' +
+          '<div><strong>' + producto.nombre + '</strong></div>' +
+          '<div style="color:#6B5E5A;">' + (producto.categoria || 'Sin categoría') + '</div>' +
+        '</div>' +
+        '<button type="button" class="btn-ghost btn-editar-producto">Editar</button>';
+
+      row.querySelector('.btn-editar-producto').addEventListener('click', function () {
+        cargarProductoParaEditar(producto.id);
+      });
+
+      editProdResultados.appendChild(row);
+    });
+  });
+
+  async function cargarProductoParaEditar(productoId) {
+    showEditProductoStatus('Cargando producto...', '');
+    try {
+      const { data: producto, error: prodError } = await supabaseClient
+        .from('productos')
+        .select('*, proveedores(nombre)')
+        .eq('id', productoId)
+        .single();
+      if (prodError) throw prodError;
+
+      const { data: variantes, error: varError } = await supabaseClient
+        .from('variantes')
+        .select('*')
+        .eq('producto_id', productoId)
+        .order('id', { ascending: true });
+      if (varError) throw varError;
+
+      productoEditandoId = producto.id;
+      imagenProductoActualUrl = producto.imagen_url;
+
+      document.getElementById('editProdNombre').value = producto.nombre || '';
+      document.getElementById('editProdDescripcion').value = producto.descripcion || '';
+      document.getElementById('editProdCategoria').value = producto.categoria || '';
+      document.getElementById('editProdCosto').value = producto.costo_base != null ? producto.costo_base : '';
+      document.getElementById('editProdProveedor').value = producto.proveedores ? producto.proveedores.nombre : '';
+      document.getElementById('editProdPrecioDetal').value = producto.precio_detal != null ? producto.precio_detal : '';
+      document.getElementById('editProdPrecioMayor').value = producto.precio_mayor != null ? producto.precio_mayor : '';
+      document.getElementById('editProdPrecioGranMayor').value = producto.precio_gran_mayor != null ? producto.precio_gran_mayor : '';
+      document.getElementById('editProdCodigoBarra').value = producto.codigo_barra || '';
+      document.getElementById('editProdActivo').checked = producto.activo !== false;
+      document.getElementById('editProdImagen').value = '';
+
+      const imagenActualDiv = document.getElementById('editProdImagenActual');
+      imagenActualDiv.innerHTML = producto.imagen_url
+        ? '<img src="' + producto.imagen_url + '" alt="Foto actual" />'
+        : 'Sin foto';
+
+      // Reconstruir las filas de tonos con los datos reales de cada variante
+      editTonosContainer.innerHTML = '';
+      (variantes || []).forEach(function (variante) {
+        editTonosContainer.appendChild(crearFilaTonoEdicion(variante));
+      });
+      if (!variantes || variantes.length === 0) {
+        editTonosContainer.appendChild(crearFilaTonoEdicion(null));
+      }
+
+      editProdCampos.style.display = 'block';
+      showEditProductoStatus('', '');
+    } catch (err) {
+      showEditProductoStatus('Error cargando el producto: ' + err.message, 'error');
+    }
+  }
+
+  function crearFilaTonoEdicion(variante) {
+    const div = document.createElement('div');
+    div.className = 'tono-form-row editing';
+    if (variante) div.dataset.varianteId = variante.id;
+
+    const imagenHtml = variante && variante.imagen_url
+      ? '<div class="tono-imagen-actual"><img src="' + variante.imagen_url + '" alt="Foto del tono" /> Foto actual</div>'
+      : '';
+
+    div.innerHTML =
+      '<input type="text" class="tono-nombre" placeholder="Tono (ej: 01, Rojo Pasión, o Único)" value="' + (variante ? variante.tono : '') + '" />' +
+      '<input type="number" class="tono-cantidad" placeholder="Cantidad disponible" min="0" value="' + (variante ? variante.cantidad_disponible : 0) + '" />' +
+      '<input type="text" class="tono-codigo-interno" placeholder="Código interno (opcional)" value="' + (variante && variante.codigo_interno ? variante.codigo_interno : '') + '" />' +
+      imagenHtml +
+      '<label style="margin-top:6px;">' + (variante ? 'Reemplazar foto del tono (opcional)' : 'Foto del tono (opcional)') + '</label>' +
+      '<input type="file" class="tono-imagen" accept="image/*" />' +
+      (variante ? '' : '<button type="button" class="quitar-tono-btn">Quitar este tono</button>');
+
+    if (!variante) {
+      div.querySelector('.quitar-tono-btn').addEventListener('click', function () {
+        div.remove();
+      });
+    }
+    return div;
+  }
+
+  editAgregarTonoBtn.addEventListener('click', function () {
+    editTonosContainer.appendChild(crearFilaTonoEdicion(null));
+  });
+
+  const editSugerirPreciosBtn2 = document.getElementById('editSugerirPreciosBtn');
+  editSugerirPreciosBtn2.addEventListener('click', async function () {
+    const costoTexto = document.getElementById('editProdCosto').value;
+    const costo = parseFloat(costoTexto);
+    if (isNaN(costo) || costo <= 0) {
+      showEditProductoStatus('Ingresa un costo válido antes de pedir la sugerencia.', 'error');
+      return;
+    }
+
+    try {
+      const { data: tasaData, error: tasaError } = await supabaseClient
+        .from('tasas_cambio').select('colchon_pct').order('fecha', { ascending: false }).limit(1).single();
+      if (tasaError) throw tasaError;
+
+      const { data: configData, error: configError } = await supabaseClient
+        .from('config_precios').select('*').order('actualizado_en', { ascending: false }).limit(1).single();
+      if (configError) throw configError;
+
+      const costoConColchon = costo * (1 + tasaData.colchon_pct / 100);
+      document.getElementById('editProdPrecioDetal').value = (costoConColchon * (1 + configData.margen_detal_pct / 100)).toFixed(2);
+      document.getElementById('editProdPrecioMayor').value = (costoConColchon * (1 + configData.margen_mayor_pct / 100)).toFixed(2);
+      document.getElementById('editProdPrecioGranMayor').value = (costoConColchon * (1 + configData.margen_gran_mayor_pct / 100)).toFixed(2);
+      showEditProductoStatus('Sugerencia calculada, ajústala si quieres antes de guardar.', 'ok');
+    } catch (err) {
+      showEditProductoStatus('No se pudo calcular la sugerencia: ' + err.message, 'error');
+    }
+  });
+
+  guardarEdicionProductoBtn.addEventListener('click', async function () {
+    if (!productoEditandoId) return;
+
+    const nombre = document.getElementById('editProdNombre').value.trim();
+    const costoTexto = document.getElementById('editProdCosto').value;
+    const precioDetal = parseFloat(document.getElementById('editProdPrecioDetal').value);
+    const precioMayor = parseFloat(document.getElementById('editProdPrecioMayor').value);
+    const precioGranMayor = parseFloat(document.getElementById('editProdPrecioGranMayor').value);
+    const proveedorNombre = document.getElementById('editProdProveedor').value.trim();
+    const archivoImagen = document.getElementById('editProdImagen').files[0];
+    const filasTono = Array.from(editTonosContainer.querySelectorAll('.tono-form-row'));
+
+    if (!nombre || !costoTexto) {
+      showEditProductoStatus('El nombre y el costo son obligatorios.', 'error');
+      return;
+    }
+    const costo = parseFloat(costoTexto);
+    if (isNaN(costo) || costo <= 0) {
+      showEditProductoStatus('El costo debe ser un número mayor a 0.', 'error');
+      return;
+    }
+    if (isNaN(precioDetal) || isNaN(precioMayor) || isNaN(precioGranMayor)) {
+      showEditProductoStatus('Completa los 3 precios, o usa "Sugerir precios".', 'error');
+      return;
+    }
+    if (filasTono.length === 0) {
+      showEditProductoStatus('Debe quedar al menos un tono.', 'error');
+      return;
+    }
+
+    guardarEdicionProductoBtn.disabled = true;
+    showEditProductoStatus('Guardando...', '');
+
+    try {
+      // 1) Resolver proveedor (buscar por nombre, o crearlo si no existe)
+      let proveedorId = null;
+      if (proveedorNombre) {
+        const { data: existentes, error: buscarError } = await supabaseClient
+          .from('proveedores').select('id').ilike('nombre', proveedorNombre).limit(1);
+        if (buscarError) throw buscarError;
+
+        if (existentes && existentes.length > 0) {
+          proveedorId = existentes[0].id;
+        } else {
+          const { data: nuevoProveedor, error: crearProvError } = await supabaseClient
+            .from('proveedores').insert({ nombre: proveedorNombre }).select('id').single();
+          if (crearProvError) throw crearProvError;
+          proveedorId = nuevoProveedor.id;
+        }
+      }
+
+      // 2) Si hay foto nueva, subirla y (best-effort) borrar la anterior
+      let imagenUrl = imagenProductoActualUrl;
+      if (archivoImagen) {
+        const filePath = Date.now() + '_' + archivoImagen.name.replace(/\s+/g, '_');
+        const { error: uploadError } = await supabaseClient
+          .storage.from('productos-fotos').upload(filePath, archivoImagen);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabaseClient.storage.from('productos-fotos').getPublicUrl(filePath);
+        imagenUrl = urlData.publicUrl;
+
+        if (imagenProductoActualUrl) {
+          const rutaAnterior = imagenProductoActualUrl.split('/productos-fotos/')[1];
+          if (rutaAnterior) {
+            await supabaseClient.storage.from('productos-fotos').remove([rutaAnterior]);
+          }
+        }
+      }
+
+      // 3) Actualizar el producto
+      const { error: productoError } = await supabaseClient
+        .from('productos')
+        .update({
+          nombre: nombre,
+          descripcion: document.getElementById('editProdDescripcion').value.trim() || null,
+          categoria: document.getElementById('editProdCategoria').value.trim() || null,
+          costo_base: costo,
+          precio_detal: precioDetal,
+          precio_mayor: precioMayor,
+          precio_gran_mayor: precioGranMayor,
+          proveedor_id: proveedorId,
+          imagen_url: imagenUrl,
+          codigo_barra: document.getElementById('editProdCodigoBarra').value.trim() || null,
+          activo: document.getElementById('editProdActivo').checked
+        })
+        .eq('id', productoEditandoId);
+      if (productoError) throw productoError;
+
+      // 4) Actualizar tonos existentes, e insertar los que sean nuevos
+      for (const fila of filasTono) {
+        const tonoNombre = fila.querySelector('.tono-nombre').value.trim() || 'Único';
+        const cantidad = parseInt(fila.querySelector('.tono-cantidad').value, 10) || 0;
+        const codigoInterno = fila.querySelector('.tono-codigo-interno').value.trim();
+        const archivoTono = fila.querySelector('.tono-imagen').files[0];
+        const varianteId = fila.dataset.varianteId;
+
+        let imagenTonoUrl = null;
+        const imagenActualTonoImg = fila.querySelector('.tono-imagen-actual img');
+        if (imagenActualTonoImg) imagenTonoUrl = imagenActualTonoImg.src;
+
+        if (archivoTono) {
+          const rutaTono = Date.now() + '_' + tonoNombre.replace(/\s+/g, '_') + '_' + archivoTono.name.replace(/\s+/g, '_');
+          const { error: uploadTonoError } = await supabaseClient
+            .storage.from('productos-fotos').upload(rutaTono, archivoTono);
+          if (uploadTonoError) throw uploadTonoError;
+          const { data: urlTonoData } = supabaseClient.storage.from('productos-fotos').getPublicUrl(rutaTono);
+
+          if (imagenTonoUrl) {
+            const rutaAnteriorTono = imagenTonoUrl.split('/productos-fotos/')[1];
+            if (rutaAnteriorTono) {
+              await supabaseClient.storage.from('productos-fotos').remove([rutaAnteriorTono]);
+            }
+          }
+          imagenTonoUrl = urlTonoData.publicUrl;
+        }
+
+        if (varianteId) {
+          const { error: varError } = await supabaseClient
+            .from('variantes')
+            .update({
+              tono: tonoNombre,
+              cantidad_disponible: cantidad,
+              codigo_interno: codigoInterno || null,
+              imagen_url: imagenTonoUrl
+            })
+            .eq('id', varianteId);
+          if (varError) throw varError;
+        } else {
+          const { error: varError } = await supabaseClient
+            .from('variantes')
+            .insert({
+              producto_id: productoEditandoId,
+              tono: tonoNombre,
+              cantidad_disponible: cantidad,
+              codigo_interno: codigoInterno || null,
+              imagen_url: imagenTonoUrl
+            });
+          if (varError) throw varError;
+        }
+      }
+
+      showEditProductoStatus('Producto "' + nombre + '" actualizado correctamente.', 'ok');
+      // Recargamos el producto para reflejar ids nuevos en tonos recién creados
+      await cargarProductoParaEditar(productoEditandoId);
+
+    } catch (err) {
+      showEditProductoStatus('Error guardando los cambios: ' + err.message, 'error');
+    } finally {
+      guardarEdicionProductoBtn.disabled = false;
+    }
+  });
+
+
   window.addEventListener('DOMContentLoaded', async function () {
     diag('Página cargada: ' + new Date().toLocaleTimeString());
     if (!initSupabaseClient()) return;
