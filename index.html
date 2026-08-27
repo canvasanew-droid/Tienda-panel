@@ -141,6 +141,26 @@
   .tono-form-row.editing { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
   .tono-imagen-actual { font-size:12px; color:#6B5E5A; margin:4px 0; }
 
+  .pedido-card { border:1.5px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px; }
+  .pedido-card .cabecera { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .pedido-card .cliente { font-weight:600; font-size:14px; }
+  .pedido-card .meta { font-size:12px; color:#6B5E5A; margin-top:2px; }
+  .pedido-card .tiempo { font-size:11px; color:var(--gold); font-weight:600; text-align:right; }
+  .pedido-item-row {
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:8px 0; border-top:1px solid var(--line); font-size:13px;
+  }
+  .pedido-item-row .cant-input { width:50px; padding:6px; border:1px solid var(--line); border-radius:6px; font-size:13px; }
+  .pedido-item-row .quitar-item { color:var(--error); background:none; border:none; font-size:12px; cursor:pointer; padding:0; }
+  .pedido-totales { display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1.5px solid var(--ink); }
+  .pedido-totales .usd { font-family:'Fraunces',serif; font-size:17px; font-weight:600; }
+  .pedido-totales .bs { font-size:12px; color:#6B5E5A; }
+  .pedido-acciones { display:flex; gap:8px; margin-top:12px; }
+  .pedido-acciones button { flex:1; padding:10px; border-radius:8px; border:none; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-confirmar-pedido { background:var(--ok); color:#fff; }
+  .btn-perdido-pedido { background:none; border:1.5px solid var(--error) !important; color:var(--error); }
+  .btn-recalcular-pedido { background:none; border:1.5px solid var(--line) !important; color:var(--ink); }
+
   .tono-form-row {
     border:1.5px dashed var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
     display:flex; flex-direction:column; gap:8px;
@@ -184,6 +204,7 @@
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn-ghost" id="toggleClienteBtn">Clientes</button>
+        <button class="btn-ghost" id="togglePedidosBtn">Pedidos</button>
         <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
         <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
         <button class="btn-ghost" id="toggleEditarProductoBtn">Editar producto</button>
@@ -211,6 +232,14 @@
         <button type="button" class="btn-confirm" id="guardarClienteBtn" style="margin-top:12px;">Guardar cambios</button>
       </div>
       <p id="clienteStatus"></p>
+    </div>
+
+    <div class="producto-form" id="pedidosForm" style="display:none;">
+      <h2>Pedidos pendientes de la tienda pública</h2>
+      <p class="sub" style="margin:0 0 10px;">Se reservan por 8 horas. Si nadie confirma el pago en ese tiempo, el stock vuelve solo a estar disponible.</p>
+      <button type="button" class="btn-ghost" id="refrescarPedidosBtn" style="width:100%; margin-bottom:14px;">Actualizar lista</button>
+      <div id="pedidosLista"></div>
+      <p id="pedidosStatus"></p>
     </div>
 
     <div class="producto-form" id="configForm" style="display:none;">
@@ -819,6 +848,154 @@
       confirmBtn.disabled = false;
     }
   });
+
+  // --- Pedidos: reservas que llegan de la tienda pública ---
+  const togglePedidosBtn = document.getElementById('togglePedidosBtn');
+  const pedidosForm = document.getElementById('pedidosForm');
+  const pedidosLista = document.getElementById('pedidosLista');
+  const pedidosStatusEl = document.getElementById('pedidosStatus');
+  const refrescarPedidosBtn = document.getElementById('refrescarPedidosBtn');
+  const VENTANA_RESERVA_HORAS = 8;
+
+  function showPedidosStatus(msg, type) {
+    pedidosStatusEl.textContent = msg;
+    pedidosStatusEl.className = type || '';
+  }
+
+  togglePedidosBtn.addEventListener('click', function () {
+    const visible = pedidosForm.style.display !== 'none';
+    pedidosForm.style.display = visible ? 'none' : 'block';
+    if (!visible) cargarPedidos();
+  });
+
+  refrescarPedidosBtn.addEventListener('click', cargarPedidos);
+
+  function tiempoRestanteTexto(creadoEn) {
+    const creado = new Date(creadoEn);
+    const expira = new Date(creado.getTime() + VENTANA_RESERVA_HORAS * 60 * 60 * 1000);
+    const msRestante = expira - new Date();
+    if (msRestante <= 0) return '⚠ Vencido, decide qué hacer';
+    const horas = Math.floor(msRestante / 3600000);
+    const minutos = Math.floor((msRestante % 3600000) / 60000);
+    return 'Quedan ' + horas + 'h ' + minutos + 'm';
+  }
+
+  async function cargarPedidos() {
+    showPedidosStatus('Cargando pedidos...', '');
+    pedidosLista.innerHTML = '';
+
+    const { data: tasaData } = await supabaseClient
+      .from('tasas_cambio').select('tasa_bcv').order('fecha', { ascending: false }).limit(1).single();
+    const tasaBcv = tasaData ? tasaData.tasa_bcv : null;
+
+    const { data: pedidos, error } = await supabaseClient
+      .from('pedidos')
+      .select('*, pedido_items(id, variante_id, cantidad, nivel_precio_aplicado, precio_unitario, subtotal, variantes(tono, productos(nombre, marca)))')
+      .eq('estado', 'pendiente')
+      .order('creado_en', { ascending: true });
+
+    if (error) {
+      showPedidosStatus('Error cargando pedidos: ' + error.message, 'error');
+      return;
+    }
+
+    if (!pedidos || pedidos.length === 0) {
+      showPedidosStatus('No hay pedidos pendientes por ahora.', '');
+      return;
+    }
+
+    showPedidosStatus('', '');
+    pedidos.forEach(function (pedido) { pedidosLista.appendChild(crearTarjetaPedido(pedido, tasaBcv)); });
+  }
+
+  function crearTarjetaPedido(pedido, tasaBcv) {
+    const card = document.createElement('div');
+    card.className = 'pedido-card';
+
+    let itemsHtml = '';
+    pedido.pedido_items.forEach(function (item) {
+      const nombreProducto = item.variantes && item.variantes.productos ? item.variantes.productos.nombre : 'Producto';
+      const marca = item.variantes && item.variantes.productos ? item.variantes.productos.marca : '';
+      const tono = item.variantes ? item.variantes.tono : '';
+      itemsHtml +=
+        '<div class="pedido-item-row" data-item-id="' + item.id + '">' +
+          '<div>' +
+            '<div>' + nombreProducto + (marca ? ' — ' + marca : '') + '</div>' +
+            '<div style="color:#8A7A74;">' + (tono || 'Único') + ' · $' + Number(item.precio_unitario).toFixed(2) + ' (' + item.nivel_precio_aplicado + ')</div>' +
+          '</div>' +
+          '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<input type="number" class="cant-input" min="1" value="' + item.cantidad + '" />' +
+            '<button type="button" class="quitar-item">Quitar</button>' +
+          '</div>' +
+        '</div>';
+    });
+
+    const totalBs = tasaBcv ? (pedido.total * tasaBcv).toLocaleString('es-VE', { maximumFractionDigits: 2 }) : null;
+
+    card.innerHTML =
+      '<div class="cabecera">' +
+        '<div>' +
+          '<div class="cliente">' + pedido.cliente_nombre + '</div>' +
+          '<div class="meta">' + pedido.cliente_telefono + ' · ' + pedido.metodo_entrega + '</div>' +
+          (pedido.direccion_envio ? '<div class="meta">' + pedido.direccion_envio + '</div>' : '') +
+        '</div>' +
+        '<div class="tiempo">' + tiempoRestanteTexto(pedido.creado_en) + '</div>' +
+      '</div>' +
+      itemsHtml +
+      '<div class="pedido-totales">' +
+        '<span class="usd">$' + Number(pedido.total).toFixed(2) + '</span>' +
+        '<span class="bs">' + (totalBs ? totalBs + ' Bs (tasa BCV)' : 'Sin tasa BCV cargada') + '</span>' +
+      '</div>' +
+      '<div class="pedido-acciones">' +
+        '<button type="button" class="btn-recalcular-pedido">Recalcular precios</button>' +
+        '<button type="button" class="btn-perdido-pedido">Marcar perdido</button>' +
+        '<button type="button" class="btn-confirmar-pedido">Confirmar pago</button>' +
+      '</div>';
+
+    // Editar cantidad de un item (se guarda al salir del campo)
+    card.querySelectorAll('.cant-input').forEach(function (input) {
+      input.addEventListener('change', async function () {
+        const itemId = input.closest('.pedido-item-row').dataset.itemId;
+        const nuevaCantidad = parseInt(input.value, 10) || 1;
+        await supabaseClient.from('pedido_items').update({ cantidad: nuevaCantidad }).eq('id', itemId);
+        showPedidosStatus('Cantidad actualizada. Recuerda "Recalcular precios" si cruzó un umbral de mayor/gran mayor.', 'ok');
+      });
+    });
+
+    // Quitar un item del pedido
+    card.querySelectorAll('.quitar-item').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const itemId = btn.closest('.pedido-item-row').dataset.itemId;
+        await supabaseClient.from('pedido_items').delete().eq('id', itemId);
+        await supabaseClient.rpc('recalcular_pedido', { p_pedido_id: pedido.id });
+        cargarPedidos();
+      });
+    });
+
+    card.querySelector('.btn-recalcular-pedido').addEventListener('click', async function () {
+      const { error } = await supabaseClient.rpc('recalcular_pedido', { p_pedido_id: pedido.id });
+      if (error) { showPedidosStatus('Error recalculando: ' + error.message, 'error'); return; }
+      showPedidosStatus('Precios recalculados.', 'ok');
+      cargarPedidos();
+    });
+
+    card.querySelector('.btn-perdido-pedido').addEventListener('click', async function () {
+      if (!confirm('¿Marcar este pedido como perdido? El stock reservado queda libre de una vez.')) return;
+      const { error } = await supabaseClient.from('pedidos').update({ estado: 'perdido' }).eq('id', pedido.id);
+      if (error) { showPedidosStatus('Error: ' + error.message, 'error'); return; }
+      cargarPedidos();
+    });
+
+    card.querySelector('.btn-confirmar-pedido').addEventListener('click', async function () {
+      if (!confirm('¿Confirmar que este cliente ya pagó? Esto descuenta el stock real y crea la venta.')) return;
+      const { error } = await supabaseClient.rpc('confirmar_pedido', { p_pedido_id: pedido.id });
+      if (error) { showPedidosStatus('Error confirmando: ' + error.message, 'error'); return; }
+      showPedidosStatus('Pedido confirmado, venta creada.', 'ok');
+      cargarPedidos();
+    });
+
+    return card;
+  }
 
   // --- Configuración: tasa de cambio y márgenes ---
   const toggleConfigBtn = document.getElementById('toggleConfigBtn');
