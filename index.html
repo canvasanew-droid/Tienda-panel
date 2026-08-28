@@ -15,6 +15,37 @@
   body { margin:0; min-height:100dvh; background:var(--bg); font-family:'Inter',sans-serif; color:var(--ink); }
   .wrap { max-width:480px; margin:0 auto; padding:24px; min-height:100dvh; display:flex; flex-direction:column; }
 
+  /* --- Sidebar del panel (después de iniciar sesión) --- */
+  #panelView { flex-direction:row; align-items:stretch; }
+  .sidebar {
+    width:230px; flex-shrink:0; background:#fff; border-right:1px solid var(--line);
+    min-height:100dvh; padding:22px 14px; display:flex; flex-direction:column; gap:3px;
+  }
+  .sidebar-brand { padding:0 10px 14px; }
+  .nav-item {
+    display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:10px;
+    border:none; background:none; text-align:left; font-size:14px; font-weight:500; color:var(--ink);
+    cursor:pointer; width:100%; font-family:inherit; transition:background-color .15s ease, color .15s ease;
+  }
+  .nav-item:hover { background:var(--bg); }
+  .nav-item.active { background:var(--wine); color:#fff; }
+  .sidebar-footer { margin-top:auto; padding-top:14px; border-top:1px solid var(--line); font-size:12px; padding-left:10px; padding-right:10px; }
+  .main-content { flex:1; min-width:0; padding:28px 32px; max-width:920px; }
+
+  @media (max-width:760px) {
+    #panelView { flex-direction:column; }
+    .sidebar {
+      width:100%; flex-direction:row; overflow-x:auto; min-height:auto;
+      border-right:none; border-bottom:1px solid var(--line); padding:10px 12px; gap:6px; align-items:center;
+      scrollbar-width:none;
+    }
+    .sidebar::-webkit-scrollbar { display:none; }
+    .sidebar-brand { display:none; }
+    .nav-item { width:auto; flex-shrink:0; white-space:nowrap; }
+    .sidebar-footer { margin-top:0; margin-left:auto; border-top:none; padding-top:0; white-space:nowrap; flex-shrink:0; }
+    .main-content { padding:18px 16px; max-width:100%; }
+  }
+
   /* --- Login --- */
   .center { flex:1; display:flex; align-items:center; justify-content:center; }
   .card { width:100%; max-width:380px; }
@@ -212,24 +243,28 @@
       <div id="diag"></div>
     </div>
   </div>
+</div>
 
   <!-- ===== PANEL (después de login) ===== -->
   <div id="panelView">
-    <div class="topbar">
-      <div>
+    <div class="sidebar">
+      <div class="sidebar-brand">
         <div class="eyebrow">Panel interno</div>
-        <div class="who">Conectado como <strong id="whoEmail"></strong></div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-ghost" id="toggleClienteBtn">Clientes</button>
-        <button class="btn-ghost" id="togglePedidosBtn">Pedidos</button>
-        <button class="btn-ghost" id="toggleAnaliticaBtn">Analítica</button>
-        <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
-        <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
-        <button class="btn-ghost" id="toggleEditarProductoBtn">Editar producto</button>
-        <button class="btn-ghost" id="logoutBtn">Cerrar sesión</button>
+      <button type="button" class="nav-item active" data-seccion="ventaForm">🛒 Vender</button>
+      <button type="button" class="nav-item" data-seccion="clienteForm">👤 Clientes</button>
+      <button type="button" class="nav-item" data-seccion="pedidosForm">📦 Pedidos</button>
+      <button type="button" class="nav-item" data-seccion="analiticaForm">📊 Analítica</button>
+      <button type="button" class="nav-item" data-seccion="productoForm">➕ Nuevo producto</button>
+      <button type="button" class="nav-item" data-seccion="editProductoForm">✏️ Editar producto</button>
+      <button type="button" class="nav-item" data-seccion="configForm">⚙️ Configuración</button>
+      <div class="sidebar-footer">
+        <div class="who">Conectado como<br><strong id="whoEmail"></strong></div>
+        <button class="btn-ghost" id="logoutBtn" style="margin-top:8px; width:100%;">Cerrar sesión</button>
       </div>
     </div>
+
+    <div class="main-content">
 
     <div class="producto-form" id="clienteForm" style="display:none;">
       <h2>Buscar cliente</h2>
@@ -413,50 +448,53 @@
     </div>
 
 
-    <div class="search-box" style="display:flex; gap:8px; align-items:center;">
-      <input type="text" id="searchInput" placeholder="Buscar por nombre, marca o código..." style="flex:1;" />
-      <button type="button" class="btn-ghost" id="scanSearchBtn" title="Escanear código con la cámara">📷</button>
-    </div>
-    <div id="scannerBox" style="display:none; margin-bottom:18px; border:1px solid var(--line); border-radius:10px; padding:10px;">
-      <div id="reader" style="width:100%;"></div>
-      <p id="scannerStatus" class="sub" style="margin:8px 0 0;">Apunta la cámara al código de barras.</p>
-      <button type="button" class="btn-ghost" id="cerrarScannerBtn" style="width:100%; margin-top:8px;">Cancelar escaneo</button>
-    </div>
-    <div class="results" id="results">
-      <div class="empty-msg">Escribe arriba para buscar productos.</div>
-    </div>
+    <div id="ventaForm">
+      <div class="search-box" style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="searchInput" placeholder="Buscar por nombre, marca o código..." style="flex:1;" />
+        <button type="button" class="btn-ghost" id="scanSearchBtn" title="Escanear código con la cámara">📷</button>
+      </div>
+      <div id="scannerBox" style="display:none; margin-bottom:18px; border:1px solid var(--line); border-radius:10px; padding:10px;">
+        <div id="reader" style="width:100%;"></div>
+        <p id="scannerStatus" class="sub" style="margin:8px 0 0;">Apunta la cámara al código de barras.</p>
+        <button type="button" class="btn-ghost" id="cerrarScannerBtn" style="width:100%; margin-top:8px;">Cancelar escaneo</button>
+      </div>
+      <div class="results" id="results">
+        <div class="empty-msg">Escribe arriba para buscar productos.</div>
+      </div>
 
-    <div class="cart-section">
-      <h2>Carrito</h2>
-      <div class="cart-list" id="cartList">
-        <div class="cart-empty">Todavía no has agregado productos.</div>
+      <div class="cart-section">
+        <h2>Carrito</h2>
+        <div class="cart-list" id="cartList">
+          <div class="cart-empty">Todavía no has agregado productos.</div>
+        </div>
+      </div>
+
+      <div class="cliente-section">
+        <h2>Datos de la venta</h2>
+        <label for="clienteNombre">Nombre del cliente</label>
+        <input type="text" id="clienteNombre" placeholder="Ej: María Pérez" />
+        <label for="clienteTelefono">Teléfono</label>
+        <input type="text" id="clienteTelefono" placeholder="Ej: +58 414-1234567" />
+        <label for="canalVenta">Canal</label>
+        <select id="canalVenta">
+          <option value="whatsapp">WhatsApp</option>
+          <option value="web">Web</option>
+          <option value="instagram">Instagram</option>
+        </select>
+      </div>
+
+      <button class="btn-confirm" id="confirmBtn">Confirmar venta</button>
+      <p id="ventaStatus"></p>
+
+      <div class="total-bar">
+        <span class="label">Total</span>
+        <span class="amount" id="cartTotal">$0.00</span>
       </div>
     </div>
 
-    <div class="cliente-section">
-      <h2>Datos de la venta</h2>
-      <label for="clienteNombre">Nombre del cliente</label>
-      <input type="text" id="clienteNombre" placeholder="Ej: María Pérez" />
-      <label for="clienteTelefono">Teléfono</label>
-      <input type="text" id="clienteTelefono" placeholder="Ej: +58 414-1234567" />
-      <label for="canalVenta">Canal</label>
-      <select id="canalVenta">
-        <option value="whatsapp">WhatsApp</option>
-        <option value="web">Web</option>
-        <option value="instagram">Instagram</option>
-      </select>
-    </div>
-
-    <button class="btn-confirm" id="confirmBtn">Confirmar venta</button>
-    <p id="ventaStatus"></p>
-
-    <div class="total-bar">
-      <span class="label">Total</span>
-      <span class="amount" id="cartTotal">$0.00</span>
     </div>
   </div>
 
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -503,6 +541,30 @@
     panelView.style.display = 'flex';
     whoEmail.textContent = user.email;
   }
+
+  // --- Navegación del panel: una sola sección visible a la vez ---
+  const SECCIONES_PANEL = ['ventaForm', 'clienteForm', 'pedidosForm', 'analiticaForm', 'productoForm', 'editProductoForm', 'configForm'];
+
+  function mostrarSeccion(idSeccion) {
+    SECCIONES_PANEL.forEach(function (id) {
+      document.getElementById(id).style.display = (id === idSeccion) ? 'block' : 'none';
+    });
+    document.querySelectorAll('.nav-item').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.seccion === idSeccion);
+    });
+
+    // Cada sección conserva lo que ya hacía al abrirse (cargar datos,
+    // o empezar limpia sin una búsqueda vieja de la sesión anterior).
+    if (idSeccion === 'pedidosForm') cargarPedidos();
+    if (idSeccion === 'analiticaForm') cargarAnalitica();
+    if (idSeccion === 'configForm') cargarConfigActual();
+    if (idSeccion === 'clienteForm') limpiarSeccionClientes();
+    if (idSeccion === 'editProductoForm') limpiarSeccionEditarProducto();
+  }
+
+  document.querySelectorAll('.nav-item[data-seccion]').forEach(function (btn) {
+    btn.addEventListener('click', function () { mostrarSeccion(btn.dataset.seccion); });
+  });
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -898,7 +960,6 @@
   });
 
   // --- Pedidos: reservas que llegan de la tienda pública ---
-  const togglePedidosBtn = document.getElementById('togglePedidosBtn');
   const pedidosForm = document.getElementById('pedidosForm');
   const pedidosLista = document.getElementById('pedidosLista');
   const pedidosStatusEl = document.getElementById('pedidosStatus');
@@ -909,12 +970,6 @@
     pedidosStatusEl.textContent = msg;
     pedidosStatusEl.className = type || '';
   }
-
-  togglePedidosBtn.addEventListener('click', function () {
-    const visible = pedidosForm.style.display !== 'none';
-    pedidosForm.style.display = visible ? 'none' : 'block';
-    if (!visible) cargarPedidos();
-  });
 
   refrescarPedidosBtn.addEventListener('click', cargarPedidos);
 
@@ -1046,7 +1101,6 @@
   }
 
   // --- Analítica ---
-  const toggleAnaliticaBtn = document.getElementById('toggleAnaliticaBtn');
   const analiticaForm = document.getElementById('analiticaForm');
   const analiticaRango = document.getElementById('analiticaRango');
   const analiticaStatusEl = document.getElementById('analiticaStatus');
@@ -1056,11 +1110,6 @@
     analiticaStatusEl.className = type || '';
   }
 
-  toggleAnaliticaBtn.addEventListener('click', function () {
-    const visible = analiticaForm.style.display !== 'none';
-    analiticaForm.style.display = visible ? 'none' : 'block';
-    if (!visible) cargarAnalitica();
-  });
   analiticaRango.addEventListener('change', cargarAnalitica);
 
   async function cargarAnalitica() {
@@ -1188,12 +1237,10 @@
   }
 
   // --- Configuración: tasa de cambio y márgenes ---
-  const toggleConfigBtn = document.getElementById('toggleConfigBtn');
   const configForm = document.getElementById('configForm');
   const tasaActualTexto = document.getElementById('tasaActualTexto');
 
   // --- Clientes: buscar y editar ---
-  const toggleClienteBtn = document.getElementById('toggleClienteBtn');
   const clienteForm = document.getElementById('clienteForm');
   const clienteBuscarBtn = document.getElementById('clienteBuscarBtn');
   const clienteBuscarInput = document.getElementById('clienteBuscarInput');
@@ -1213,19 +1260,15 @@
     clienteStatusEl.className = type || '';
   }
 
-  toggleClienteBtn.addEventListener('click', function () {
-    const visible = clienteForm.style.display !== 'none';
-    clienteForm.style.display = visible ? 'none' : 'block';
-    if (!visible) {
-      // Al abrir la sección, empezamos limpios: sin búsqueda previa
-      // ni formulario de edición abierto de una sesión anterior.
-      clienteBuscarInput.value = '';
-      clienteResultados.innerHTML = '';
-      clienteEditForm.style.display = 'none';
-      clienteEditandoId = null;
-      showClienteStatus('', '');
-    }
-  });
+  function limpiarSeccionClientes() {
+    // Al abrir la sección, empezamos limpios: sin búsqueda previa
+    // ni formulario de edición abierto de una sesión anterior.
+    clienteBuscarInput.value = '';
+    clienteResultados.innerHTML = '';
+    clienteEditForm.style.display = 'none';
+    clienteEditandoId = null;
+    showClienteStatus('', '');
+  }
 
   clienteBuscarBtn.addEventListener('click', async function () {
     const termino = clienteBuscarInput.value.trim();
@@ -1314,12 +1357,6 @@
     showClienteStatus('Cliente actualizado correctamente.', 'ok');
   });
 
-  toggleConfigBtn.addEventListener('click', async function () {
-    const visible = configForm.style.display !== 'none';
-    configForm.style.display = visible ? 'none' : 'block';
-    if (!visible) await cargarConfigActual();
-  });
-
   async function cargarConfigActual() {
     tasaActualTexto.textContent = 'Cargando...';
     try {
@@ -1404,7 +1441,6 @@
       statusEl3.className = 'error';
     }
   });
-  const toggleProductoBtn = document.getElementById('toggleProductoBtn');
   const productoForm = document.getElementById('productoForm');
   const guardarProductoBtn = document.getElementById('guardarProductoBtn');
   const productoStatusEl = document.getElementById('productoStatus');
@@ -1413,11 +1449,6 @@
     productoStatusEl.textContent = msg;
     productoStatusEl.className = type || '';
   }
-
-  toggleProductoBtn.addEventListener('click', function () {
-    const visible = productoForm.style.display !== 'none';
-    productoForm.style.display = visible ? 'none' : 'block';
-  });
 
   // --- Filas de tono dinámicas ---
   const tonosContainer = document.getElementById('tonosContainer');
@@ -1619,7 +1650,6 @@
   });
 
   // --- Editar producto: buscar, cargar tonos, guardar cambios ---
-  const toggleEditarProductoBtn = document.getElementById('toggleEditarProductoBtn');
   const editProductoForm = document.getElementById('editProductoForm');
   const editProdBuscarBtn = document.getElementById('editProdBuscarBtn');
   const editProdBuscarInput = document.getElementById('editProdBuscarInput');
@@ -1637,17 +1667,13 @@
     editProductoStatusEl.className = type || '';
   }
 
-  toggleEditarProductoBtn.addEventListener('click', function () {
-    const visible = editProductoForm.style.display !== 'none';
-    editProductoForm.style.display = visible ? 'none' : 'block';
-    if (!visible) {
-      editProdBuscarInput.value = '';
-      editProdResultados.innerHTML = '';
-      editProdCampos.style.display = 'none';
-      productoEditandoId = null;
-      showEditProductoStatus('', '');
-    }
-  });
+  function limpiarSeccionEditarProducto() {
+    editProdBuscarInput.value = '';
+    editProdResultados.innerHTML = '';
+    editProdCampos.style.display = 'none';
+    productoEditandoId = null;
+    showEditProductoStatus('', '');
+  }
 
   editProdBuscarBtn.addEventListener('click', async function () {
     const termino = editProdBuscarInput.value.trim();
