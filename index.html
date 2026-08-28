@@ -246,6 +246,10 @@
         <input type="text" id="clienteEditNombre" />
         <label for="clienteEditTelefono">Teléfono</label>
         <input type="text" id="clienteEditTelefono" />
+        <label for="clienteEditMetodoEntrega">Método de entrega preferido</label>
+        <input type="text" id="clienteEditMetodoEntrega" placeholder="Ej: Retiro en tienda, Delivery en Carabobo..." />
+        <label for="clienteEditDireccion">Dirección / datos de envío</label>
+        <textarea id="clienteEditDireccion" rows="2" placeholder="Se llena sola cuando compra por la web; edítala si hace falta"></textarea>
         <label for="clienteEditNotas">Notas</label>
         <textarea id="clienteEditNotas" rows="2" placeholder="Ej: cliente fiel, revendedora..."></textarea>
         <button type="button" class="btn-confirm" id="guardarClienteBtn" style="margin-top:12px;">Guardar cambios</button>
@@ -1197,6 +1201,8 @@
   const clienteEditForm = document.getElementById('clienteEditForm');
   const clienteEditNombre = document.getElementById('clienteEditNombre');
   const clienteEditTelefono = document.getElementById('clienteEditTelefono');
+  const clienteEditMetodoEntrega = document.getElementById('clienteEditMetodoEntrega');
+  const clienteEditDireccion = document.getElementById('clienteEditDireccion');
   const clienteEditNotas = document.getElementById('clienteEditNotas');
   const guardarClienteBtn = document.getElementById('guardarClienteBtn');
   const clienteStatusEl = document.getElementById('clienteStatus');
@@ -1234,7 +1240,7 @@
 
     const { data, error } = await supabaseClient
       .from('clientes')
-      .select('id, nombre, telefono, notas')
+      .select('id, nombre, telefono, notas, metodo_entrega_preferido, direccion_envio')
       .or('nombre.ilike.%' + termino + '%,telefono.ilike.%' + termino + '%')
       .limit(10);
 
@@ -1256,6 +1262,7 @@
         '<div>' +
           '<div><strong>' + cliente.nombre + '</strong></div>' +
           '<div style="color:#6B5E5A;">' + (cliente.telefono || 'Sin teléfono') + '</div>' +
+          (cliente.direccion_envio ? '<div style="color:#8A7A74; font-size:12px;">' + cliente.direccion_envio + '</div>' : '') +
         '</div>' +
         '<button type="button" class="btn-ghost btn-editar-cliente">Editar</button>';
 
@@ -1263,6 +1270,8 @@
         clienteEditandoId = cliente.id;
         clienteEditNombre.value = cliente.nombre || '';
         clienteEditTelefono.value = cliente.telefono || '';
+        clienteEditMetodoEntrega.value = cliente.metodo_entrega_preferido || '';
+        clienteEditDireccion.value = cliente.direccion_envio || '';
         clienteEditNotas.value = cliente.notas || '';
         clienteEditForm.style.display = 'block';
         showClienteStatus('', '');
@@ -1289,6 +1298,8 @@
       .update({
         nombre: nombre,
         telefono: clienteEditTelefono.value.trim() || null,
+        metodo_entrega_preferido: clienteEditMetodoEntrega.value.trim() || null,
+        direccion_envio: clienteEditDireccion.value.trim() || null,
         notas: clienteEditNotas.value.trim() || null
       })
       .eq('id', clienteEditandoId);
