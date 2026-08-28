@@ -222,7 +222,7 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="loginWrap">
 
   <!-- ===== LOGIN ===== -->
   <div class="center" id="loginView">
@@ -537,7 +537,7 @@
   }
 
   function showPanel(user) {
-    loginView.style.display = 'none';
+    document.getElementById('loginWrap').style.display = 'none';
     panelView.style.display = 'flex';
     whoEmail.textContent = user.email;
   }
@@ -599,6 +599,7 @@
     cart = [];
     renderCart();
     panelView.style.display = 'none';
+    document.getElementById('loginWrap').style.display = 'flex';
     loginView.style.display = 'flex';
     form.reset();
   });
