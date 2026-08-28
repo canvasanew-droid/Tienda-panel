@@ -161,6 +161,24 @@
   .btn-perdido-pedido { background:none; border:1.5px solid var(--error) !important; color:var(--error); }
   .btn-recalcular-pedido { background:none; border:1.5px solid var(--line) !important; color:var(--ink); }
 
+  .analitica-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 4px; }
+  .analitica-card { border:1.5px solid var(--line); border-radius:10px; padding:12px; }
+  .analitica-card .valor { font-family:'Fraunces',serif; font-size:20px; font-weight:600; }
+  .analitica-card .etiqueta { font-size:12px; color:#6B5E5A; margin-top:2px; }
+  .ranking-row {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:9px 0; border-bottom:1px solid var(--line); font-size:13px;
+  }
+  .ranking-row .puesto { color:var(--gold); font-weight:700; width:18px; flex-shrink:0; }
+  .ranking-row .nombre { flex:1; }
+  .ranking-row .metrica { font-weight:600; text-align:right; flex-shrink:0; }
+  .salud-badge {
+    display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; margin-left:6px;
+  }
+  .salud-agotado { background:#F3DADA; color:var(--error); }
+  .salud-bajo { background:#F3E9D8; color:#8A5A1E; }
+  .salud-estancado { background:var(--line); color:#6B5E5A; }
+
   .tono-form-row {
     border:1.5px dashed var(--line); border-radius:8px; padding:12px; margin-bottom:10px;
     display:flex; flex-direction:column; gap:8px;
@@ -205,6 +223,7 @@
       <div style="display:flex; gap:8px;">
         <button class="btn-ghost" id="toggleClienteBtn">Clientes</button>
         <button class="btn-ghost" id="togglePedidosBtn">Pedidos</button>
+        <button class="btn-ghost" id="toggleAnaliticaBtn">Analítica</button>
         <button class="btn-ghost" id="toggleConfigBtn">Configuración</button>
         <button class="btn-ghost" id="toggleProductoBtn">+ Nuevo producto</button>
         <button class="btn-ghost" id="toggleEditarProductoBtn">Editar producto</button>
@@ -240,6 +259,31 @@
       <button type="button" class="btn-ghost" id="refrescarPedidosBtn" style="width:100%; margin-bottom:14px;">Actualizar lista</button>
       <div id="pedidosLista"></div>
       <p id="pedidosStatus"></p>
+    </div>
+
+    <div class="producto-form" id="analiticaForm" style="display:none;">
+      <h2>Analítica</h2>
+      <label for="analiticaRango">Período</label>
+      <select id="analiticaRango">
+        <option value="7">Últimos 7 días</option>
+        <option value="30" selected>Últimos 30 días</option>
+        <option value="90">Últimos 90 días</option>
+        <option value="9999">Todo el historial</option>
+      </select>
+
+      <div id="analiticaResumen" class="analitica-grid"></div>
+      <p class="sub" style="margin:6px 0 0;">*Estimada con el costo cargado en cada producto; los que aún tienen el costo placeholder de la importación de Domun no van a reflejar tu ganancia real hasta que los corrijas.</p>
+
+      <h2>Productos más vendidos</h2>
+      <div id="analiticaTopProductos"></div>
+
+      <h2>Clientes más valiosos</h2>
+      <div id="analiticaTopClientes"></div>
+
+      <h2>Salud del stock</h2>
+      <div id="analiticaSalud"></div>
+
+      <p id="analiticaStatus"></p>
     </div>
 
     <div class="producto-form" id="configForm" style="display:none;">
@@ -995,6 +1039,148 @@
     });
 
     return card;
+  }
+
+  // --- Analítica ---
+  const toggleAnaliticaBtn = document.getElementById('toggleAnaliticaBtn');
+  const analiticaForm = document.getElementById('analiticaForm');
+  const analiticaRango = document.getElementById('analiticaRango');
+  const analiticaStatusEl = document.getElementById('analiticaStatus');
+
+  function showAnaliticaStatus(msg, type) {
+    analiticaStatusEl.textContent = msg;
+    analiticaStatusEl.className = type || '';
+  }
+
+  toggleAnaliticaBtn.addEventListener('click', function () {
+    const visible = analiticaForm.style.display !== 'none';
+    analiticaForm.style.display = visible ? 'none' : 'block';
+    if (!visible) cargarAnalitica();
+  });
+  analiticaRango.addEventListener('change', cargarAnalitica);
+
+  async function cargarAnalitica() {
+    showAnaliticaStatus('Cargando...', '');
+
+    const dias = parseInt(analiticaRango.value, 10);
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+
+    const { data: ventas, error: ventasError } = await supabaseClient
+      .from('vista_ventas_detalle')
+      .select('*')
+      .gte('fecha', desde.toISOString());
+
+    const { data: salud, error: saludError } = await supabaseClient
+      .from('vista_salud_stock')
+      .select('*')
+      .eq('activo', true);
+
+    if (ventasError || saludError) {
+      showAnaliticaStatus('Error cargando analítica: ' + ((ventasError || saludError).message), 'error');
+      return;
+    }
+
+    showAnaliticaStatus('', '');
+    renderResumen(ventas || []);
+    renderTopProductos(ventas || []);
+    renderTopClientes(ventas || []);
+    renderSaludStock(salud || []);
+  }
+
+  function renderResumen(ventas) {
+    const totalFacturado = ventas.reduce(function (s, v) { return s + Number(v.subtotal); }, 0);
+    const ventasUnicas = new Set(ventas.map(function (v) { return v.venta_id; })).size;
+    const ticketPromedio = ventasUnicas > 0 ? totalFacturado / ventasUnicas : 0;
+    const rentabilidad = ventas.reduce(function (s, v) {
+      return s + (Number(v.subtotal) - Number(v.costo_base || 0) * v.cantidad);
+    }, 0);
+
+    document.getElementById('analiticaResumen').innerHTML =
+      tarjetaAnalitica('$' + totalFacturado.toFixed(2), 'Facturado en el período') +
+      tarjetaAnalitica(ventasUnicas, 'Ventas') +
+      tarjetaAnalitica('$' + ticketPromedio.toFixed(2), 'Ticket promedio') +
+      tarjetaAnalitica('$' + rentabilidad.toFixed(2), 'Ganancia estimada*');
+  }
+
+  function tarjetaAnalitica(valor, etiqueta) {
+    return '<div class="analitica-card"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + '</div></div>';
+  }
+
+  function agruparPorClave(items, obtenerClave) {
+    const grupos = {};
+    items.forEach(function (item) {
+      const clave = obtenerClave(item);
+      if (!grupos[clave]) grupos[clave] = [];
+      grupos[clave].push(item);
+    });
+    return grupos;
+  }
+
+  function renderTopProductos(ventas) {
+    const grupos = agruparPorClave(ventas, function (v) { return v.producto_id; });
+    const filas = Object.values(grupos).map(function (items) {
+      return {
+        nombre: items[0].producto_nombre + (items[0].marca ? ' — ' + items[0].marca : ''),
+        unidades: items.reduce(function (s, i) { return s + i.cantidad; }, 0),
+        ingresos: items.reduce(function (s, i) { return s + Number(i.subtotal); }, 0)
+      };
+    }).sort(function (a, b) { return b.ingresos - a.ingresos; }).slice(0, 5);
+
+    const cont = document.getElementById('analiticaTopProductos');
+    if (filas.length === 0) { cont.innerHTML = '<p class="sub" style="margin:0;">Sin ventas en este período.</p>'; return; }
+
+    cont.innerHTML = filas.map(function (f, i) {
+      return '<div class="ranking-row"><span class="puesto">' + (i + 1) + '</span>' +
+        '<span class="nombre">' + f.nombre + ' <span style="color:#8A7A74;">(' + f.unidades + ' uds)</span></span>' +
+        '<span class="metrica">$' + f.ingresos.toFixed(2) + '</span></div>';
+    }).join('');
+  }
+
+  function renderTopClientes(ventas) {
+    const grupos = agruparPorClave(ventas, function (v) { return v.cliente_id; });
+    const filas = Object.values(grupos).map(function (items) {
+      return {
+        nombre: items[0].cliente_nombre,
+        compras: new Set(items.map(function (i) { return i.venta_id; })).size,
+        gasto: items.reduce(function (s, i) { return s + Number(i.subtotal); }, 0)
+      };
+    }).sort(function (a, b) { return b.gasto - a.gasto; }).slice(0, 5);
+
+    const cont = document.getElementById('analiticaTopClientes');
+    if (filas.length === 0) { cont.innerHTML = '<p class="sub" style="margin:0;">Sin clientes en este período.</p>'; return; }
+
+    cont.innerHTML = filas.map(function (f, i) {
+      return '<div class="ranking-row"><span class="puesto">' + (i + 1) + '</span>' +
+        '<span class="nombre">' + f.nombre + ' <span style="color:#8A7A74;">(' + f.compras + ' compra' + (f.compras === 1 ? '' : 's') + ')</span></span>' +
+        '<span class="metrica">$' + f.gasto.toFixed(2) + '</span></div>';
+    }).join('');
+  }
+
+  function renderSaludStock(salud) {
+    const hoy = new Date();
+    const agotados = salud.filter(function (p) { return Number(p.stock_total) <= 0; });
+    const bajoStock = salud.filter(function (p) { return Number(p.stock_total) > 0 && Number(p.stock_total) <= 4; });
+    const estancados = salud.filter(function (p) {
+      if (Number(p.stock_total) <= 0) return false;
+      if (!p.ultima_venta) return true;
+      const dias = (hoy - new Date(p.ultima_venta)) / 86400000;
+      return dias > 60;
+    });
+
+    function listaCorta(items, badgeClass, badgeTexto) {
+      if (items.length === 0) return '<p class="sub" style="margin:4px 0 10px;">Ninguno.</p>';
+      return items.slice(0, 8).map(function (p) {
+        return '<div class="ranking-row"><span class="nombre">' + p.nombre + (p.marca ? ' — ' + p.marca : '') + '</span>' +
+          '<span class="salud-badge ' + badgeClass + '">' + badgeTexto + '</span></div>';
+      }).join('') + (items.length > 8 ? '<p class="sub" style="margin:4px 0;">+' + (items.length - 8) + ' más</p>' : '');
+    }
+
+    document.getElementById('analiticaSalud').innerHTML =
+      '<p class="sub" style="margin:0 0 6px;"><strong>' + agotados.length + '</strong> agotados · <strong>' + bajoStock.length + '</strong> con poco stock · <strong>' + estancados.length + '</strong> sin ventas en 60+ días</p>' +
+      '<h3 style="font-size:14px; margin:14px 0 4px;">Agotados</h3>' + listaCorta(agotados, 'salud-agotado', 'Agotado') +
+      '<h3 style="font-size:14px; margin:14px 0 4px;">Poco stock (≤4)</h3>' + listaCorta(bajoStock, 'salud-bajo', 'Bajo') +
+      '<h3 style="font-size:14px; margin:14px 0 4px;">Sin movimiento (60+ días)</h3>' + listaCorta(estancados, 'salud-estancado', 'Estancado');
   }
 
   // --- Configuración: tasa de cambio y márgenes ---
